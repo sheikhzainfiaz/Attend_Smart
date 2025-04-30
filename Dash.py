@@ -11,7 +11,13 @@ def open_student_details(page: ft.Page):
     # Add the student management page (the existing code of student.py)
     page.controls.clear()
     import Student  # This imports the student.py script
-    Student.main(page)  
+    Student.main(page)
+
+def open_teacher_details(page: ft.Page):
+    page.controls.clear()
+    import teacher
+    teacher.main(page)
+    
 def show_main(page: ft.Page):
     logging.debug("Starting main function")
     page.title = "Face Recognition System"
@@ -118,7 +124,7 @@ def show_main(page: ft.Page):
                 ("Student Details", ft.icons.PERSON, lambda e: open_student_details(page)),
                 ("Face Detection", ft.icons.CAMERA, lambda e: show_sub_page("Face Detection")),
                 ("Attendance", ft.icons.EVENT, lambda e: show_sub_page("Attendance")),
-                ("Help Desk", ft.icons.HELP_OUTLINE, lambda e: show_sub_page("Help Desk")),
+                ("Teacher Details", ft.icons.PEOPLE, lambda e: open_teacher_details(page)),
             ]
 
             button_data_row2 = [
