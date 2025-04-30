@@ -5,6 +5,26 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
+# Function to fetch sections from the MySQL database
+def get_sections_from_db():
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="face_db",
+            port=3306
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT SectionID, Name FROM section")
+        sections = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+        conn.close()
+        logging.debug(f"Fetched {len(sections)} sections")
+        return sections
+    except mysql.connector.Error as err:
+        logging.error(f"Database error fetching sections: {err}")
+        return []
+
 def main(page: ft.Page):
     logging.debug("Starting student management page")
     page.title = "Student Management - Face Recognition System"
@@ -50,9 +70,18 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
     )
-    section_id = ft.TextField(
-        label="Section ID",
-        hint_text="Enter section ID",
+    
+    # Fetch sections from the database
+    sections = get_sections_from_db()
+    
+    # Dropdown for section_id
+    section_id = ft.Dropdown(
+        label="Section",
+        hint_text="Select a section",
+        options=[
+            ft.dropdown.Option(key=str(section["id"]), text=section["name"])
+            for section in sections
+        ] if sections else [ft.dropdown.Option(text="No sections available")],
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -62,31 +91,32 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        input_filter=ft.InputFilter(regex_string=r"^[0-9]*$"),
+        width=750,
     )
+
     photo_sample = ft.Dropdown(
-    label="Photo Sample",
-    hint_text="Select Yes or No",
-    options=[
-        ft.dropdown.Option("Yes"),
-        ft.dropdown.Option("No"),
-    ],
-    value=None,
-    border_color=accent_color,
-    focused_border_color=primary_color,
-    filled=False,
-    bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-    border_radius=10,
-    prefix_icon=ft.icons.PHOTO,
-    text_style=ft.TextStyle(
-        color=ft.colors.WHITE,       # MATCHED
-        size=16,                     # Set size explicitly
-        weight=ft.FontWeight.W_400,  # Same as typical TextField text
-    ),
-    label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-    hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-    width=750,
-)
+        label="Photo Sample",
+        hint_text="Select Yes or No",
+        options=[
+            ft.dropdown.Option("Yes"),
+            ft.dropdown.Option("No"),
+        ],
+        value=None,
+        border_color=accent_color,
+        focused_border_color=primary_color,
+        filled=True,
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        border_radius=10,
+        prefix_icon=ft.icons.PHOTO,
+        text_style=ft.TextStyle(
+            color=ft.colors.WHITE,
+            size=16,
+            weight=ft.FontWeight.W_400,
+        ),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        width=750,
+    )
 
     status_text = ft.Text("", color=ft.colors.RED_400, size=14, weight=ft.FontWeight.W_500)
 
@@ -192,8 +222,8 @@ def main(page: ft.Page):
             if student:
                 roll_no.value = student[0]
                 full_name.value = student[1]
-                section_id.value = str(student[2])
-                photo_sample.value = student[3]  # Set Dropdown to Yes/No or None
+                section_id.value = str(student[2])  # Set Dropdown value to section_id
+                photo_sample.value = student[3]
                 status_text.value = "Student selected for editing"
                 status_text.color = ft.colors.BLUE_200
                 logging.debug("Form populated with selected student data")
@@ -207,11 +237,11 @@ def main(page: ft.Page):
     def add_click(e):
         roll = roll_no.value.strip()
         name = full_name.value.strip()
-        section = section_id.value.strip()
-        photo = photo_sample.value  # Yes, No, or None
+        section = section_id.value  # Dropdown value is section_id
+        photo = photo_sample.value
 
         if not roll or not name or not section:
-            status_text.value = "Roll Number, Full Name, and Section ID are required!"
+            status_text.value = "Roll Number, Full Name, and Section are required!"
             status_text.color = ft.colors.RED_400
             logging.warning("Add failed: Missing required fields")
             page.update()
@@ -253,11 +283,11 @@ def main(page: ft.Page):
 
         roll = roll_no.value.strip()
         name = full_name.value.strip()
-        section = section_id.value.strip()
-        photo = photo_sample.value  # Yes, No, or None
+        section = section_id.value  # Dropdown value is section_id
+        photo = photo_sample.value
 
         if not roll or not name or not section:
-            status_text.value = "Roll Number, Full Name, and Section ID are required!"
+            status_text.value = "Roll Number, Full Name, and Section are required!"
             status_text.color = ft.colors.RED_400
             logging.warning("Update failed: Missing required fields")
             page.update()
@@ -321,8 +351,6 @@ def main(page: ft.Page):
             page.update()
 
     def take_photo_click(e):
-        # Placeholder for camera functionality
-        # TODO: Add camera integration (e.g., using OpenCV or a webcam library)
         status_text.value = "Camera functionality not implemented yet."
         status_text.color = ft.colors.BLUE_200
         logging.debug("Take Photo button clicked")
@@ -331,7 +359,7 @@ def main(page: ft.Page):
     def clear_form():
         roll_no.value = ""
         full_name.value = ""
-        section_id.value = ""
+        section_id.value = None  # Reset Dropdown
         photo_sample.value = None
         selected_roll_no.current = None
         status_text.value = ""
