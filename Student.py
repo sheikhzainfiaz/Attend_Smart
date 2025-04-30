@@ -1,7 +1,8 @@
 import flet as ft
 import mysql.connector
 import logging
-
+import cv2
+import os
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -41,6 +42,60 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
+    def take_photo_and_save(roll_number):
+        """Capture up to 5 photos and overwrite in a loop using the roll_number as folder."""
+        if not roll_number:
+        
+            return
+
+        save_path = os.path.join("photos", roll_number)
+        os.makedirs(save_path, exist_ok=True)
+
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            
+            return
+
+        count = 1
+        max_photos = 5
+        
+
+        while True:
+            success, img = cap.read()
+            if not success:
+                
+                break
+
+            cv2.imshow("Take Photo", img)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('s'):  # Capture on 's'
+                # Make the image square
+                height, width, _ = img.shape
+                square_size = min(height, width)
+                x = (width - square_size) // 2
+                y = (height - square_size) // 2
+                square_img = img[y:y + square_size, x:x + square_size]
+
+                # Resize to standard
+                square_img = cv2.resize(square_img, (224, 224))
+
+                # Save image with overwrite logic
+                filename = os.path.join(save_path, f"{roll_number}_{count}.jpg")
+                cv2.imwrite(filename, square_img)
+                print(f"Saved {filename}")
+
+                count += 1
+                if count > max_photos:
+                    break # Restart overwriting
+
+            elif key == ord('q'):  # Quit on 'q'
+                
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
 
     # Function to show SnackBar messages
     def show_message(message, is_error=False):
@@ -353,9 +408,18 @@ def main(page: ft.Page):
             page.update()
 
     def take_photo_click(e):
-        show_message("Camera functionality not implemented yet.")
-        logging.debug("Take Photo button clicked")
-        page.update()
+        
+        roll = roll_no.value.strip()
+        if not roll:
+            show_message("Enter roll number before taking a photo!", is_error=True)
+            return
+
+        filename = take_photo_and_save(roll)
+        if filename:
+            show_message("Photo captured and saved!")
+            photo_sample.value = "Yes"
+            page.update()
+
 
     def clear_form():
         roll_no.value = ""
@@ -454,7 +518,8 @@ def main(page: ft.Page):
     # Card container (removed status_text)
     card = ft.Container(
         content=ft.Column(
-            [
+            [   
+                
                 ft.Text(
                     "Student Management",
                     size=28,
