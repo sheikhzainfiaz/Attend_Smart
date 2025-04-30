@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def main(page: ft.Page):
+def show_main(page: ft.Page):
     logging.debug("Starting main function")
     page.title = "Face Recognition System"
     page.bgcolor = ft.colors.BLACK
@@ -214,4 +214,4 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     logging.debug("Running Flet app")
-    ft.app(target=main)
+    ft.app(target=show_main)

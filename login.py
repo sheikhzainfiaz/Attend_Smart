@@ -1,6 +1,7 @@
 import flet as ft
 import mysql.connector
-
+from Dash import show_main
+from teacher_dash import das_show
 
 def main(page: ft.Page):
     page.title = "Login - Face Recognition System"
@@ -83,20 +84,30 @@ def main(page: ft.Page):
                 host="localhost",
                 user="root",
                 password="root",
-                database="face_recognizer_db",
+                database="face_db",
                 port=3306
             )
             cursor = conn.cursor()
 
             table = "admins" if role == "admin" else "teachers"
-            cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
+            # Modified query to fetch both password and name (for teachers)
+            if role == "admin":
+                cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
+            else:
+                cursor.execute(f"SELECT password, Full_Name FROM {table} WHERE username=%s", (uname,))
+            
             result = cursor.fetchone()
             conn.close()
 
             if result:
                 if result[0] == pwd:
-                    status_text.color = ft.colors.GREEN_400
-                    status_text.value = f"{role.capitalize()} Login Successful!"
+                    if role == "admin":
+                        show_main(page)
+                    else:
+                        # For teachers, get the name from the query result (second column)
+                        teacher_name = result[1] if result[1] else "Teacher"  # Fallback if name is null
+                        das_show(page, teacher_name)
+                    return
                 else:
                     status_text.color = ft.colors.RED_400
                     status_text.value = "Incorrect password"
