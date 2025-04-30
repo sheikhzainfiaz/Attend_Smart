@@ -32,7 +32,6 @@ def main(page: ft.Page):
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
     page.padding = 0
-    page.scroll = ft.ScrollMode.AUTO
 
     # Custom colors
     primary_color = ft.colors.BLUE_600
@@ -42,6 +41,22 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
+
+    # Function to show SnackBar messages
+    def show_message(message, is_error=False):
+        page.snack_bar = ft.SnackBar(
+            content=ft.Text(
+                message,
+                color=ft.colors.WHITE,
+                weight=ft.FontWeight.W_500,
+                size=14,
+            ),
+            bgcolor=ft.colors.RED_600 if is_error else ft.colors.GREEN_600,
+            duration=3000,  # Display for 3 seconds
+            padding=10,
+        )
+        page.snack_bar.open = True
+        page.update()
 
     # Form fields
     roll_no = ft.TextField(
@@ -119,12 +134,10 @@ def main(page: ft.Page):
         width=750,
     )
 
-    status_text = ft.Text("", color=ft.colors.RED_400, size=14, weight=ft.FontWeight.W_500)
-
-    # Search field
+    # Search field (updated for responsive search)
     search_field = ft.TextField(
-        label="Search by Full Name",
-        hint_text="Enter name to search",
+        label="Search Students",
+        hint_text="Search by name, roll number, or section ID",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -134,6 +147,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        on_change=lambda e: update_table(e.control.value.strip()),  # Update table as user types
     )
 
     # DataTable
@@ -170,8 +184,9 @@ def main(page: ft.Page):
             cursor = conn.cursor()
             query = "SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student"
             if search_term:
-                query += " WHERE Full_Name LIKE %s"
-                cursor.execute(query, (f"%{search_term}%",))
+                # Search across Roll_no, Full_Name, and SectionID
+                query += " WHERE Full_Name LIKE %s OR Roll_no LIKE %s OR SectionID LIKE %s"
+                cursor.execute(query, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
             else:
                 cursor.execute(query)
             rows = cursor.fetchall()
@@ -180,9 +195,7 @@ def main(page: ft.Page):
             return rows
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            status_text.value = f"Database Error: {err}"
-            status_text.color = ft.colors.RED_400
-            page.update()
+            show_message(f"Database Error: {err}", is_error=True)
             return []
 
     def update_table(search_term=""):
@@ -223,27 +236,24 @@ def main(page: ft.Page):
             if student:
                 roll_no.value = student[0]
                 full_name.value = student[1]
-                section_id.value = str(student[2])  # Set Dropdown value to section_id
+                section_id.value = str(student[2])
                 photo_sample.value = student[3]
-                status_text.value = "Student selected for editing"
-                status_text.color = ft.colors.BLUE_200
+                show_message("Student selected for editing")
                 logging.debug("Form populated with selected student data")
             page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            status_text.value = f"Database Error: {err}"
-            status_text.color = ft.colors.RED_400
+            show_message(f"Database Error: {err}", is_error=True)
             page.update()
 
     def add_click(e):
         roll = roll_no.value.strip()
         name = full_name.value.strip()
-        section = section_id.value  # Dropdown value is section_id
+        section = section_id.value
         photo = photo_sample.value
 
         if not roll or not name or not section:
-            status_text.value = "Roll Number, Full Name, and Section are required!"
-            status_text.color = ft.colors.RED_400
+            show_message("Roll Number, Full Name, and Section are required!", is_error=True)
             logging.warning("Add failed: Missing required fields")
             page.update()
             return
@@ -263,33 +273,29 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            status_text.value = "Student added successfully!"
-            status_text.color = ft.colors.GREEN_400
+            show_message("Student added successfully!")
             logging.info(f"Added student: {roll}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            status_text.value = f"Database Error: {err}"
-            status_text.color = ft.colors.RED_400
+            show_message(f"Database Error: {err}", is_error=True)
             page.update()
 
     def update_click(e):
         if not selected_roll_no.current:
-            status_text.value = "Please select a student to update!"
-            status_text.color = ft.colors.RED_400
+            show_message("Please select a student to update!", is_error=True)
             logging.warning("Update failed: No student selected")
             page.update()
             return
-
+        
         roll = roll_no.value.strip()
         name = full_name.value.strip()
-        section = section_id.value  # Dropdown value is section_id
+        section = section_id.value
         photo = photo_sample.value
 
         if not roll or not name or not section:
-            status_text.value = "Roll Number, Full Name, and Section are required!"
-            status_text.color = ft.colors.RED_400
+            show_message("Roll Number, Full Name, and Section are required!", is_error=True)
             logging.warning("Update failed: Missing required fields")
             page.update()
             return
@@ -309,21 +315,18 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            status_text.value = "Student updated successfully!"
-            status_text.color = ft.colors.GREEN_400
+            show_message("Student updated successfully!")
             logging.info(f"Updated student: {roll}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            status_text.value = f"Database Error: {err}"
-            status_text.color = ft.colors.RED_400
+            show_message(f"Database Error: {err}", is_error=True)
             page.update()
 
     def delete_click(e):
         if not selected_roll_no.current:
-            status_text.value = "Please select a student to delete!"
-            status_text.color = ft.colors.RED_400
+            show_message("Please select a student to delete!", is_error=True)
             logging.warning("Delete failed: No student selected")
             page.update()
             return
@@ -340,38 +343,30 @@ def main(page: ft.Page):
             cursor.execute("DELETE FROM student WHERE Roll_no=%s", (selected_roll_no.current,))
             conn.commit()
             conn.close()
-            status_text.value = "Student deleted successfully!"
-            status_text.color = ft.colors.GREEN_400
+            show_message("Student deleted successfully!")
             logging.info(f"Deleted student: {selected_roll_no.current}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            status_text.value = f"Database Error: {err}"
-            status_text.color = ft.colors.RED_400
+            show_message(f"Database Error: {err}", is_error=True)
             page.update()
 
     def take_photo_click(e):
-        status_text.value = "Camera functionality not implemented yet."
-        status_text.color = ft.colors.BLUE_200
+        show_message("Camera functionality not implemented yet.")
         logging.debug("Take Photo button clicked")
         page.update()
 
     def clear_form():
         roll_no.value = ""
         full_name.value = ""
-        section_id.value = None  # Reset Dropdown
+        section_id.value = None
         photo_sample.value = None
         selected_roll_no.current = None
-        status_text.value = ""
+        search_field.value = ""  # Clear search field
         logging.debug("Form cleared")
+        update_table()  # Refresh table to show all students
         page.update()
-
-    def search_click(e):
-        search_term = search_field.value.strip()
-        status_text.value = ""
-        logging.debug(f"Searching with term: {search_term}")
-        update_table(search_term)
 
     # Buttons
     add_btn = ft.ElevatedButton(
@@ -451,26 +446,12 @@ def main(page: ft.Page):
             overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
         ),
     )
-    search_btn = ft.ElevatedButton(
-        text="Search",
-        on_click=search_click,
-        style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=12),
-            padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=primary_color,
-            color=ft.colors.WHITE,
-            elevation={"default": 5, "hovered": 8},
-            animation_duration=300,
-            text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-        ),
-    )
 
     # Initial table load
     logging.debug("Loading initial table data")
     update_table()
 
-    # Card container
+    # Card container (removed status_text)
     card = ft.Container(
         content=ft.Column(
             [
@@ -503,11 +484,7 @@ def main(page: ft.Page):
                     spacing=15,
                 ),
                 ft.Divider(height=20, color=ft.colors.TRANSPARENT),
-                ft.Row(
-                    [search_field, search_btn],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=10,
-                ),
+                search_field,  # Just the search field, no button
                 ft.Container(
                     content=ft.Column(
                         [data_table],
@@ -518,7 +495,6 @@ def main(page: ft.Page):
                     border_radius=10,
                     height=300,
                 ),
-                status_text,
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
