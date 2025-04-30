@@ -185,9 +185,7 @@ def main(page: ft.Page):
             ],
         ),
     )
-
     page.add(background)
-
 
 if __name__ == "__main__":
     ft.app(target=main)
