@@ -3,10 +3,15 @@ import os
 import traceback
 import logging
 
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
+def open_student_details(page: ft.Page):
+    # Add the student management page (the existing code of student.py)
+    page.controls.clear()
+    import Student  # This imports the student.py script
+    Student.main(page)  
 def show_main(page: ft.Page):
     logging.debug("Starting main function")
     page.title = "Face Recognition System"
@@ -110,7 +115,7 @@ def show_main(page: ft.Page):
             )
 
             button_data_row1 = [
-                ("Student Details", ft.icons.PERSON, lambda e: show_sub_page("Student Details")),
+                ("Student Details", ft.icons.PERSON, lambda e: open_student_details(page)),
                 ("Face Detection", ft.icons.CAMERA, lambda e: show_sub_page("Face Detection")),
                 ("Attendance", ft.icons.EVENT, lambda e: show_sub_page("Attendance")),
                 ("Help Desk", ft.icons.HELP_OUTLINE, lambda e: show_sub_page("Help Desk")),
