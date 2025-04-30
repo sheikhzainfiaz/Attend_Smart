@@ -170,5 +170,9 @@ WHERE t.Full_Name = 'Kasloom'
   AND DATE(a.Attendance_Timestamp) = '2025-04-30';
 
 
-
+CREATE TABLE admins (
+    Admin_ID INT AUTO_INCREMENT PRIMARY KEY,
+    Username VARCHAR(50) UNIQUE NOT NULL,
+    Password VARCHAR(100) NOT NULL
+);
 
