@@ -117,7 +117,7 @@ def main(page: ft.Page):
         ],
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
+        filled=False,
         bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.HOURGLASS_TOP,
