@@ -19,6 +19,7 @@ def das_show(page: ft.Page, teacher_name="Teacher"):
     page.padding = 20
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.scroll = ft.ScrollMode.AUTO
 
     # Colors
     primary_color = ft.Colors.TEAL_600

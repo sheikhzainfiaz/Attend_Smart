@@ -25,6 +25,7 @@ def show_main(page: ft.Page):
     page.padding = 20
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.scroll = ft.ScrollMode.AUTO
 
     # Dark Theme Colors
     primary_color = ft.colors.BLUE_600
