@@ -144,7 +144,7 @@ def main(page: ft.Page):
             if role == "admin":
                 cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
             else:
-                cursor.execute(f"SELECT password, Full_Name FROM {table} WHERE username=%s", (uname,))
+                cursor.execute(f"SELECT password, Teacher_ID FROM {table} WHERE username=%s", (uname,))
             
             result = cursor.fetchone()
             conn.close()
@@ -156,8 +156,8 @@ def main(page: ft.Page):
                         show_main(page)
                     else:
                         # For teachers, get the name from the query result (second column)
-                        teacher_name = result[1] if result[1] else "Teacher"  # Fallback if name is null
-                        teacher_dashboard(page, teacher_name)
+                        teacher_id = result[1] if result[1] else "Teacher"  # Fallback if name is null
+                        teacher_dashboard(page, teacher_id)
                     return
                 else:
                     show_alert_dialog("Login Failed", "Incorrect password", is_error=True)
