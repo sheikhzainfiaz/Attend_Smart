@@ -20,13 +20,17 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_alert_dialog(title, message):
+    def show_alert_dialog(title, message, is_success=False, is_error=False):
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text(title),
-            content=ft.Text(message),
+            content=ft.Text(
+                message,
+                color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+            ),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
-            actions_alignment=ft.MainAxisAlignment.END
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
         )
 
         def close_dialog():
@@ -46,7 +50,8 @@ def main(page: ft.Page):
                 ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
-            actions_alignment=ft.MainAxisAlignment.END
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
         )
 
         def close_dialog():
@@ -114,10 +119,30 @@ def main(page: ft.Page):
 
     selected_id = ft.Ref[str]()
 
+    def reset_field_borders():
+        for field in [full_name, email, phone, username, password]:
+            field.border_color = accent_color
+        page.update()
+
+    def validate_fields(fields):
+        reset_field_borders()
+        missing_fields = []
+        for field, value in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                missing_fields.append(field.label)
+        page.update()
+        if len(missing_fields) == 1:
+            return f"{missing_fields[0]} is required!"
+        elif missing_fields:
+            return f"The following fields are required: {', '.join(missing_fields)}"
+        return None
+
     def clear_form():
         full_name.value = email.value = phone.value = username.value = password.value = ""
         search_field.value = ""
         selected_id.current = None
+        reset_field_borders()
         update_table()
         page.update()
 
@@ -133,7 +158,7 @@ def main(page: ft.Page):
             conn.close()
             return data
         except Exception as e:
-            show_alert_dialog("Error", f"Error fetching data: {e}")
+            show_alert_dialog("Error", f"Error fetching data: {e}", is_error=True)
             return []
 
     data_table = ft.DataTable(
@@ -181,13 +206,22 @@ def main(page: ft.Page):
             conn.close()
             if t:
                 full_name.value, email.value, phone.value, username.value, password.value = t
+            reset_field_borders()
             page.update()
         except Exception as e:
-            show_alert_dialog("Error", f"Select error: {e}")
+            show_alert_dialog("Error", f"Select error: {e}", is_error=True)
 
     def add_teacher(e):
-        if not all([full_name.value.strip(), email.value.strip(), phone.value.strip(), username.value.strip(), password.value.strip()]):
-            show_alert_dialog("Validation Error", "All fields are required!")
+        fields = [
+            (full_name, full_name.value.strip()),
+            (email, email.value.strip()),
+            (phone, phone.value.strip()),
+            (username, username.value.strip()),
+            (password, password.value.strip()),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             return
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
@@ -196,15 +230,28 @@ def main(page: ft.Page):
                            (full_name.value, email.value, phone.value, username.value, password.value))
             conn.commit()
             conn.close()
-            show_alert_dialog("Success", "Teacher added successfully!")
+            reset_field_borders()
+            show_alert_dialog("Success", "Teacher added successfully!", is_success=True)
             clear_form()
             update_table()
         except Exception as e:
-            show_alert_dialog("Error", f"Add error: {e}")
+            show_alert_dialog("Error", f"Add error: {e}", is_error=True)
 
     def update_teacher(e):
         if not selected_id.current:
-            show_alert_dialog("Validation Error", "Select a teacher to update")
+            show_alert_dialog("Validation Error", "Select a teacher to update", is_error=True)
+            return
+
+        fields = [
+            (full_name, full_name.value.strip()),
+            (email, email.value.strip()),
+            (phone, phone.value.strip()),
+            (username, username.value.strip()),
+            (password, password.value.strip()),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             return
 
         def confirm_update():
@@ -215,17 +262,18 @@ def main(page: ft.Page):
                                (full_name.value, email.value, phone.value, username.value, password.value, selected_id.current))
                 conn.commit()
                 conn.close()
-                show_alert_dialog("Success", "Teacher updated successfully!")
+                reset_field_borders()
+                show_alert_dialog("Success", "Teacher updated successfully!", is_success=True)
                 clear_form()
                 update_table()
             except Exception as e:
-                show_alert_dialog("Error", f"Update error: {e}")
+                show_alert_dialog("Error", f"Update error: {e}", is_error=True)
 
         show_confirm_dialog("Confirm Update", "Are you sure you want to update this teacher?", confirm_update)
 
     def delete_teacher(e):
         if not selected_id.current:
-            show_alert_dialog("Validation Error", "Select a teacher to delete")
+            show_alert_dialog("Validation Error", "Select a teacher to delete", is_error=True)
             return
 
         def confirm_delete():
@@ -235,11 +283,12 @@ def main(page: ft.Page):
                 cursor.execute("DELETE FROM teachers WHERE Teacher_ID=%s", (selected_id.current,))
                 conn.commit()
                 conn.close()
-                show_alert_dialog("Success", "Teacher deleted successfully!")
+                reset_field_borders()
+                show_alert_dialog("Success", "Teacher deleted successfully!", is_success=True)
                 clear_form()
                 update_table()
             except Exception as e:
-                show_alert_dialog("Error", f"Delete error: {e}")
+                show_alert_dialog("Error", f"Delete error: {e}", is_error=True)
 
         show_confirm_dialog("Confirm Delete", "Are you sure you want to delete this teacher?", confirm_delete)
 

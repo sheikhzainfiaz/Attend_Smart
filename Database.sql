@@ -70,16 +70,14 @@ CREATE TABLE attendance (
     CourseID INT,
     SectionID INT,
     Roll_no VARCHAR(20),
-    Attendance_Timestamp DATETIME NOT NULL,
+    Attendance_Date DATE NOT NULL,
+    Attendance_Time TIME NOT NULL,
     Status ENUM('Present', 'Absent') NOT NULL,
     FOREIGN KEY (Teacher_ID, CourseID, SectionID)
         REFERENCES enrollment(Teacher_ID, CourseID, SectionID)
         ON DELETE CASCADE,
     FOREIGN KEY (Roll_no) REFERENCES student(Roll_no) ON DELETE CASCADE
 );
-
-
-
 
 INSERT INTO section (Name, Semester, Department)
 VALUES ('SEA', '4th', 'Computer Science');

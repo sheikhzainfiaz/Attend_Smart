@@ -21,7 +21,7 @@ def get_sections_from_db():
         cursor.execute("SELECT SectionID, Name FROM section")
         sections = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
         conn.close()
-        logging.debug(f"Fetched {len(sections)} sections")
+        logging.debug(f"Fetched {len(sections)} sections: {sections}")
         return sections
     except mysql.connector.Error as err:
         logging.error(f"Database error fetching sections: {err}")
@@ -45,40 +45,55 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    # Function to show AlertDialog
-    def show_alert_dialog(title, message, is_error=False):
-        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
-        try:
-            dialog = ft.AlertDialog(
-                modal=True,
-                title=ft.Text(title),
-                content=ft.Text(message),
-                actions=[
-                    ft.TextButton("OK", on_click=lambda e: close_dialog())
-                ],
-                actions_alignment=ft.MainAxisAlignment.END
-            )
+    # AlertDialog function
+    def show_alert_dialog(title, message, is_success=False, is_error=False):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(
+                message,
+                color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+            ),
+            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
+        )
 
-            def close_dialog():
-                logging.debug("Closing AlertDialog")
-                dialog.open = False
-                page.update()
+        def close_dialog():
+            dialog.open = False
+            page.update()
 
-            page.overlay.append(dialog)
-            dialog.open = True
-            logging.debug("Dialog added to overlay, calling page.update()")
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
+
+    # Confirm dialog function
+    def show_confirm_dialog(title, message, on_confirm):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
+                ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
+        )
+
+        def close_dialog():
+            dialog.open = False
             page.update()
-            logging.debug("AlertDialog should now be visible")
-        except Exception as ex:
-            logging.error(f"Error displaying dialog: {ex}")
-            page.add(ft.Text(f"Error: {ex}"))
-            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
 
     # Function to capture photos
     def take_photo_and_save(roll_number):
         """Capture up to 5 photos and overwrite in a loop using the roll_number as folder."""
         if not roll_number:
-            show_alert_dialog("Error", "Enter roll number before taking a photo!", is_error=True)
+            show_alert_dialog("Error", "Roll Number is required!", is_error=True)
             return None
 
         save_path = os.path.join("photos", roll_number)
@@ -171,7 +186,8 @@ def main(page: ft.Page):
         options=[
             ft.dropdown.Option(key=str(section["id"]), text=section["name"])
             for section in sections
-        ] if sections else [ft.dropdown.Option(text="No sections available")],
+        ] if sections else [ft.dropdown.Option(key="0", text="No sections available")],
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
@@ -188,8 +204,8 @@ def main(page: ft.Page):
         label="Photo Sample",
         hint_text="Select Yes or No",
         options=[
-            ft.dropdown.Option("Yes"),
-            ft.dropdown.Option("No"),
+            ft.dropdown.Option(key="Yes", text="Yes"),
+            ft.dropdown.Option(key="No", text="No"),
         ],
         value=None,
         border_color=accent_color,
@@ -211,7 +227,7 @@ def main(page: ft.Page):
     # Search field
     search_field = ft.TextField(
         label="Search Students",
-        hint_text="Search by name, roll number, or section ID",
+        hint_text="Search by name or roll number",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -244,6 +260,29 @@ def main(page: ft.Page):
     )
 
     selected_roll_no = ft.Ref[str]()
+
+    # Helper function to reset field borders
+    def reset_field_borders():
+        roll_no.border_color = accent_color
+        full_name.border_color = accent_color
+        section_id.border_color = accent_color
+        photo_sample.border_color = accent_color
+        page.update()
+
+    # Helper function to highlight empty fields and get error message
+    def validate_fields(fields):
+        reset_field_borders()
+        missing_fields = []
+        for field, value in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                missing_fields.append(field.label)
+        page.update()
+        if len(missing_fields) == 1:
+            return f"{missing_fields[0]} is required!"
+        elif missing_fields:
+            return f"The following fields are required: {', '.join(missing_fields)}"
+        return None
 
     def fetch_students(search_term=""):
         logging.debug(f"Fetching students with search term: {search_term}")
@@ -309,17 +348,13 @@ def main(page: ft.Page):
             if student:
                 roll_no.value = student[0]
                 full_name.value = student[1]
-                section_id.value = str(student[2])
-                photo_sample.value = student[3]
-                show_alert_dialog("Success", "Student selected for editing")
-                logging.debug("Form populated with selected student data")
-            else:
-                show_alert_dialog("Error", "Student not found!", is_error=True)
+                section_id.value = str(student[2]) if student[2] else None
+                photo_sample.value = student[3] if student[3] else None
+                logging.debug(f"Selected student - Section: {section_id.value}, Photo Sample: {photo_sample.value}")
+            reset_field_borders()
             page.update()
         except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
-            page.update()
 
     def add_click(e):
         logging.debug("Add button clicked")
@@ -329,21 +364,16 @@ def main(page: ft.Page):
         photo = photo_sample.value
 
         # Validate all fields
-        missing_fields = []
-        if not roll:
-            missing_fields.append("Roll Number")
-        if not name:
-            missing_fields.append("Full Name")
-        if not section:
-            missing_fields.append("Section")
-        if not photo:
-            missing_fields.append("Photo Sample")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (roll_no, roll),
+            (full_name, name),
+            (section_id, section),
+            (photo_sample, photo)
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Add failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
         try:
@@ -361,7 +391,8 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            show_alert_dialog("Success", "Student added successfully!")
+            reset_field_borders()
+            show_alert_dialog("Success", "Student added successfully!", is_success=True)
             logging.info(f"Added student: {roll}")
             clear_form()
             update_table()
@@ -374,98 +405,92 @@ def main(page: ft.Page):
         logging.debug("Update button clicked")
         if not selected_roll_no.current:
             show_alert_dialog("Validation Error", "Please select a student to update!", is_error=True)
-            logging.warning("Update failed: No student selected")
-            page.update()
             return
-        
+
         roll = roll_no.value.strip() if roll_no.value else ""
         name = full_name.value.strip() if full_name.value else ""
         section = section_id.value
         photo = photo_sample.value
 
         # Validate all fields
-        missing_fields = []
-        if not roll:
-            missing_fields.append("Roll Number")
-        if not name:
-            missing_fields.append("Full Name")
-        if not section:
-            missing_fields.append("Section")
-        if not photo:
-            missing_fields.append("Photo Sample")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (roll_no, roll),
+            (full_name, name),
+            (section_id, section),
+            (photo_sample, photo)
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Update failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
-        try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE student SET Roll_no=%s, Full_Name=%s, SectionID=%s, PhotoSample=%s WHERE Roll_no=%s",
-                (roll, name, section, photo, selected_roll_no.current)
-            )
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Student updated successfully!")
-            logging.info(f"Updated student: {roll}")
-            clear_form()
-            update_table()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_alert_dialog("Database Error", f"Error updating student: {err}", is_error=True)
-            page.update()
+        def confirm_update():
+            try:
+                conn = mysql.connector.connect(
+                    host="localhost",
+                    user="root",
+                    password="root",
+                    database="face_db",
+                    port=3306
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE student SET Roll_no=%s, Full_Name=%s, SectionID=%s, PhotoSample=%s WHERE Roll_no=%s",
+                    (roll, name, section, photo, selected_roll_no.current)
+                )
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Student updated successfully!", is_success=True)
+                clear_form()
+                update_table()
+            except mysql.connector.Error as err:
+                show_alert_dialog("Database Error", f"Error updating student: {err}", is_error=True)
+
+        show_confirm_dialog("Confirm Update", "Are you sure you want to update this student?", confirm_update)
 
     def delete_click(e):
         logging.debug("Delete button clicked")
         if not selected_roll_no.current:
             show_alert_dialog("Validation Error", "Please select a student to delete!", is_error=True)
-            logging.warning("Delete failed: No student selected")
-            page.update()
             return
 
-        try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM student WHERE Roll_no=%s", (selected_roll_no.current,))
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Student deleted successfully!")
-            logging.info(f"Deleted student: {selected_roll_no.current}")
-            clear_form()
-            update_table()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_alert_dialog("Database Error", f"Error deleting student: {err}", is_error=True)
-            page.update()
+        def confirm_delete():
+            try:
+                conn = mysql.connector.connect(
+                    host="localhost",
+                    user="root",
+                    password="root",
+                    database="face_db",
+                    port=3306
+                )
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM student WHERE Roll_no=%s", (selected_roll_no.current,))
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Student deleted successfully!", is_success=True)
+                clear_form()
+                update_table()
+            except mysql.connector.Error as err:
+                show_alert_dialog("Database Error", f"Error deleting student: {err}", is_error=True)
+
+        show_confirm_dialog("Confirm Delete", "Are you sure you want to delete this student?", confirm_delete)
 
     def take_photo_click(e):
         logging.debug("Take Photo button clicked")
         roll = roll_no.value.strip() if roll_no.value else ""
         if not roll:
-            show_alert_dialog("Validation Error", "Enter roll number before taking a photo!", is_error=True)
+            show_alert_dialog("Validation Error", "Roll Number is required!", is_error=True)
             logging.warning("Take photo failed: No roll number provided")
             return
 
         filename = take_photo_and_save(roll)
         if filename:
-            show_alert_dialog("Success", "Photo captured and saved!")
+            show_alert_dialog("Success", "Photo captured and saved!", is_success=True)
             photo_sample.value = "Yes"
+            reset_field_borders()
             page.update()
 
     def clear_form():
@@ -475,8 +500,10 @@ def main(page: ft.Page):
         photo_sample.value = None
         selected_roll_no.current = None
         search_field.value = ""
-        logging.debug("Form cleared")
-        update_table()
+        reset_field_borders()
+        logging.debug(f"Form cleared - Section: {section_id.value}, Photo Sample: {photo_sample.value}")
+        section_id.update()
+        photo_sample.update()
         page.update()
 
     # Buttons

@@ -1,7 +1,7 @@
 import flet as ft
 import mysql.connector
 from Dash import show_main
-from teacher_dash import teacher_dashboard
+from teacher_dash import das_show
 
 def main(page: ft.Page):
     page.title = "Login - Face Recognition System"
@@ -19,6 +19,28 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
+
+    # AlertDialog function
+    def show_alert_dialog(title, message, is_success=False, is_error=False):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(
+                message,
+                color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+            ),
+            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
+        )
+
+        def close_dialog():
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
 
     # Input fields with modern styling
     username = ft.TextField(
@@ -57,6 +79,7 @@ def main(page: ft.Page):
             ft.dropdown.Option("teacher", text="Teacher")
         ],
         hint_text="Select Role",
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
@@ -67,17 +90,43 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
     )
-    status_text = ft.Text("", color=ft.colors.RED_400, size=14, weight=ft.FontWeight.W_500)
+
+    # Helper function to reset field borders
+    def reset_field_borders():
+        username.border_color = accent_color
+        password.border_color = accent_color
+        role_dropdown.border_color = accent_color
+        page.update()
+
+    # Helper function to highlight empty fields and get error message
+    def validate_fields(fields):
+        reset_field_borders()
+        missing_fields = []
+        for field, value in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                missing_fields.append(field.label)
+        page.update()
+        if len(missing_fields) == 1:
+            return f"{missing_fields[0]} is required!"
+        elif missing_fields:
+            return f"The following fields are required: {', '.join(missing_fields)}"
+        return None
 
     def login_click(e):
-        uname = username.value.strip()
-        pwd = password.value.strip()
+        uname = username.value.strip() if username.value else ""
+        pwd = password.value.strip() if password.value else ""
         role = role_dropdown.value
 
-        if not uname or not pwd or not role:
-            status_text.value = "All fields are required!"
-            status_text.color = ft.colors.RED_400
-            page.update()
+        # Validate all fields
+        fields = [
+            (username, uname),
+            (password, pwd),
+            (role_dropdown, role),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             return
 
         try:
@@ -95,32 +144,28 @@ def main(page: ft.Page):
             if role == "admin":
                 cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
             else:
-                cursor.execute(f"SELECT password, Teacher_ID FROM {table} WHERE username=%s", (uname,))
+                cursor.execute(f"SELECT password, Full_Name FROM {table} WHERE username=%s", (uname,))
             
             result = cursor.fetchone()
             conn.close()
 
             if result:
                 if result[0] == pwd:
+                    show_alert_dialog("Success", "Login successful!", is_success=True)
                     if role == "admin":
                         show_main(page)
                     else:
                         # For teachers, get the name from the query result (second column)
-                        teacher_id = result[1] if result[1] else "Teacher"  # Fallback if name is null
-                        teacher_dashboard(page, teacher_id)
+                        teacher_name = result[1] if result[1] else "Teacher"  # Fallback if name is null
+                        das_show(page, teacher_name)
                     return
                 else:
-                    status_text.color = ft.colors.RED_400
-                    status_text.value = "Incorrect password"
+                    show_alert_dialog("Login Failed", "Incorrect password", is_error=True)
             else:
-                status_text.color = ft.colors.RED_400
-                status_text.value = "Username not found"
+                show_alert_dialog("Login Failed", "Username not found", is_error=True)
 
         except mysql.connector.Error as err:
-            status_text.color = ft.colors.RED_400
-            status_text.value = f"Database Error: {err}"
-
-        page.update()
+            show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
 
     # Login button with hover effect
     login_btn = ft.ElevatedButton(
@@ -160,7 +205,6 @@ def main(page: ft.Page):
                 password,
                 role_dropdown,
                 login_btn,
-                status_text,
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,

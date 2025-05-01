@@ -20,17 +20,21 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_alert_dialog(title, message, is_error=False):
-        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
+    def show_alert_dialog(title, message, is_success=False, is_error=False):
+        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsSuccess={is_success}, IsError={is_error}")
         try:
             dialog = ft.AlertDialog(
                 modal=True,
                 title=ft.Text(title),
-                content=ft.Text(message),
+                content=ft.Text(
+                    message,
+                    color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+                ),
                 actions=[
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
-                actions_alignment=ft.MainAxisAlignment.END
+                actions_alignment=ft.MainAxisAlignment.END,
+                bgcolor=ft.colors.WHITE
             )
 
             def close_dialog():
@@ -47,6 +51,27 @@ def main(page: ft.Page):
             logging.error(f"Error displaying dialog: {ex}")
             page.add(ft.Text(f"Error: {ex}"))
             page.update()
+
+    def show_confirm_dialog(title, message, on_confirm):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
+                ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
+        )
+
+        def close_dialog():
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
 
     name = ft.TextField(
         label="Section Name",
@@ -75,10 +100,11 @@ def main(page: ft.Page):
             ft.dropdown.Option("7th"),
             ft.dropdown.Option("8th"),
         ],
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        filled=False,
+        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.CALENDAR_TODAY,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
@@ -102,8 +128,8 @@ def main(page: ft.Page):
     )
 
     search_field = ft.TextField(
-        label="Search by Section Name",
-        hint_text="Enter section name",
+        label="Search Sections",
+        hint_text="Enter name for search",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -137,12 +163,33 @@ def main(page: ft.Page):
 
     selected_id = ft.Ref[str]()
 
+    def reset_field_borders():
+        name.border_color = accent_color
+        semester.border_color = accent_color
+        department.border_color = accent_color
+        page.update()
+
+    def validate_fields(fields):
+        reset_field_borders()
+        missing_fields = []
+        for field, value in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                missing_fields.append(field.label)
+        page.update()
+        if len(missing_fields) == 1:
+            return f"{missing_fields[0]} is required!"
+        elif missing_fields:
+            return f"The following fields are required: {', '.join(missing_fields)}"
+        return None
+
     def clear_form():
         name.value = ""
         semester.value = None
         department.value = ""
         search_field.value = ""
         selected_id.current = None
+        reset_field_borders()
         update_table()
         page.update()
 
@@ -151,12 +198,14 @@ def main(page: ft.Page):
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             if search_term:
-                cursor.execute("SELECT SectionID, Name, Semester, Department FROM section WHERE Name LIKE %s", (f"%{search_term}%",))
+                # Search in both Name and Department for partial matches
+                query = "SELECT SectionID, Name, Semester, Department FROM section WHERE Name LIKE %s OR Department LIKE %s"
+                cursor.execute(query, (f"%{search_term}%", f"%{search_term}%"))
             else:
                 cursor.execute("SELECT SectionID, Name, Semester, Department FROM section")
             data = cursor.fetchall()
             conn.close()
-            logging.debug(f"Fetched {len(data)} sections")
+            logging.debug(f"Fetched {len(data)} sections: {data}")
             return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -192,6 +241,7 @@ def main(page: ft.Page):
             if s:
                 name.value, semester.value, department.value = s
                 logging.debug("Form populated with selected section data")
+            reset_field_borders()
             page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -205,19 +255,15 @@ def main(page: ft.Page):
         dept = department.value.strip() if department.value else ""
 
         # Validate fields
-        missing_fields = []
-        if not section_name:
-            missing_fields.append("Section Name")
-        if not sem:
-            missing_fields.append("Semester")
-        if not dept:
-            missing_fields.append("Department")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (name, section_name),
+            (semester, sem),
+            (department, dept),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Add failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
         try:
@@ -227,7 +273,8 @@ def main(page: ft.Page):
                            (section_name, sem, dept))
             conn.commit()
             conn.close()
-            show_alert_dialog("Success", "Section added successfully!")
+            reset_field_borders()
+            show_alert_dialog("Success", "Section added successfully!", is_success=True)
             logging.info(f"Added section: {section_name}")
             clear_form()
         except mysql.connector.Error as err:
@@ -248,35 +295,35 @@ def main(page: ft.Page):
         dept = department.value.strip() if department.value else ""
 
         # Validate fields
-        missing_fields = []
-        if not section_name:
-            missing_fields.append("Section Name")
-        if not sem:
-            missing_fields.append("Semester")
-        if not dept:
-            missing_fields.append("Department")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (name, section_name),
+            (semester, sem),
+            (department, dept),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Update failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("UPDATE section SET Name=%s, Semester=%s, Department=%s WHERE SectionID=%s",
-                           (section_name, sem, dept, selected_id.current))
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Section updated successfully!")
-            logging.info(f"Updated section: {section_name}")
-            clear_form()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_alert_dialog("Database Error", f"Error updating section: {err}", is_error=True)
-            page.update()
+        def confirm_update():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE section SET Name=%s, Semester=%s, Department=%s WHERE SectionID=%s",
+                               (section_name, sem, dept, selected_id.current))
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Section updated successfully!", is_success=True)
+                logging.info(f"Updated section: {section_name}")
+                clear_form()
+            except mysql.connector.Error as err:
+                logging.error(f"Database error: {err}")
+                show_alert_dialog("Database Error", f"Error updating section: {err}", is_error=True)
+                page.update()
+
+        show_confirm_dialog("Confirm Update", "Are you sure you want to update this section?", confirm_update)
 
     def delete_section(e):
         logging.debug("Delete button clicked")
@@ -286,19 +333,23 @@ def main(page: ft.Page):
             page.update()
             return
 
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM section WHERE SectionID=%s", (selected_id.current,))
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Section deleted successfully!")
-            logging.info(f"Deleted section: {selected_id.current}")
-            clear_form()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_alert_dialog("Database Error", f"Error deleting section: {err}", is_error=True)
-            page.update()
+        def confirm_delete():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM section WHERE SectionID=%s", (selected_id.current,))
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Section deleted successfully!", is_success=True)
+                logging.info(f"Deleted section: {selected_id.current}")
+                clear_form()
+            except mysql.connector.Error as err:
+                logging.error(f"Database error: {err}")
+                show_alert_dialog("Database Error", f"Error deleting section: {err}", is_error=True)
+                page.update()
+
+        show_confirm_dialog("Confirm Delete", "Are you sure you want to delete this section?", confirm_delete)
 
     add_btn = ft.ElevatedButton(
         text="Add Section",

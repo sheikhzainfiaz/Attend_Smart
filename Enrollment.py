@@ -20,17 +20,21 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_alert_dialog(title, message, is_error=False):
-        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
+    def show_alert_dialog(title, message, is_success=False, is_error=False):
+        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsSuccess={is_success}, IsError={is_error}")
         try:
             dialog = ft.AlertDialog(
                 modal=True,
                 title=ft.Text(title),
-                content=ft.Text(message),
+                content=ft.Text(
+                    message,
+                    color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+                ),
                 actions=[
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
-                actions_alignment=ft.MainAxisAlignment.END
+                actions_alignment=ft.MainAxisAlignment.END,
+                bgcolor=ft.colors.WHITE
             )
 
             def close_dialog():
@@ -48,29 +52,36 @@ def main(page: ft.Page):
             page.add(ft.Text(f"Error: {ex}"))
             page.update()
 
-    def show_message(message, is_error=False):
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text(
-                message,
-                color=ft.colors.WHITE,
-                weight=ft.FontWeight.W_500,
-                size=14,
-            ),
-            bgcolor=ft.colors.RED_600 if is_error else ft.colors.GREEN_600,
-            duration=3000,
-            padding=10,
+    def show_confirm_dialog(title, message, on_confirm):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
+                ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
         )
-        page.snack_bar.open = True
+
+        def close_dialog():
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
         page.update()
 
     # Dropdown for Teacher_ID
     teacher_dropdown = ft.Dropdown(
         label="Teacher",
         hint_text="Select a teacher",
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        filled=False,
+        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.PERSON,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
@@ -83,10 +94,11 @@ def main(page: ft.Page):
     course_dropdown = ft.Dropdown(
         label="Course",
         hint_text="Select a course",
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        filled=False,
+        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.BOOK,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
@@ -99,10 +111,11 @@ def main(page: ft.Page):
     section_dropdown = ft.Dropdown(
         label="Section",
         hint_text="Select a section",
+        value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        filled=False,
+        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.CLASS_,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
@@ -148,12 +161,33 @@ def main(page: ft.Page):
 
     selected_ids = ft.Ref[dict]()
 
+    def reset_field_borders():
+        teacher_dropdown.border_color = accent_color
+        course_dropdown.border_color = accent_color
+        section_dropdown.border_color = accent_color
+        page.update()
+
+    def validate_fields(fields):
+        reset_field_borders()
+        missing_fields = []
+        for field, value in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                missing_fields.append(field.label)
+        page.update()
+        if len(missing_fields) == 1:
+            return f"{missing_fields[0]} is required!"
+        elif missing_fields:
+            return f"The following fields are required: {', '.join(missing_fields)}"
+        return None
+
     def clear_form():
         teacher_dropdown.value = None
         course_dropdown.value = None
         section_dropdown.value = None
         search_field.value = ""
         selected_ids.current = None
+        reset_field_borders()
         update_table()
         page.update()
 
@@ -181,7 +215,7 @@ def main(page: ft.Page):
             page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
 
     def fetch_enrollments(search_term=""):
         try:
@@ -212,7 +246,7 @@ def main(page: ft.Page):
             return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
             return []
 
     def update_table(search_term=""):
@@ -233,11 +267,12 @@ def main(page: ft.Page):
         page.update()
 
     def select_enrollment(teacher_id, course_id, section_id):
-        selected_ids.current = {"Teacher_ID": teacher_id, "CourseID": course_id, "SectionID": section_id}#pragma: no cover
+        selected_ids.current = {"Teacher_ID": teacher_id, "CourseID": course_id, "SectionID": section_id}
         teacher_dropdown.value = str(teacher_id)
         course_dropdown.value = str(course_id)
         section_dropdown.value = str(section_id)
         logging.debug("Form populated with selected enrollment data")
+        reset_field_borders()
         page.update()
 
     def add_enrollment(e):
@@ -247,19 +282,15 @@ def main(page: ft.Page):
         section = section_dropdown.value
 
         # Validate fields
-        missing_fields = []
-        if not teacher:
-            missing_fields.append("Teacher")
-        if not course:
-            missing_fields.append("Course")
-        if not section:
-            missing_fields.append("Section")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (teacher_dropdown, teacher),
+            (course_dropdown, course),
+            (section_dropdown, section),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Add failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
         try:
@@ -271,12 +302,13 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            show_message("Enrollment added successfully!")
+            reset_field_borders()
+            show_alert_dialog("Success", "Enrollment added successfully!", is_success=True)
             logging.info(f"Added enrollment: Teacher {teacher}, Course {course}, Section {section}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
             page.update()
 
     def update_enrollment(e):
@@ -292,44 +324,44 @@ def main(page: ft.Page):
         section = section_dropdown.value
 
         # Validate fields
-        missing_fields = []
-        if not teacher:
-            missing_fields.append("Teacher")
-        if not course:
-            missing_fields.append("Course")
-        if not section:
-            missing_fields.append("Section")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
+        fields = [
+            (teacher_dropdown, teacher),
+            (course_dropdown, course),
+            (section_dropdown, section),
+        ]
+        error_message = validate_fields(fields)
+        if error_message:
             logging.warning(f"Update failed: {error_message}")
             show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
             return
 
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE enrollment SET Teacher_ID=%s, CourseID=%s, SectionID=%s WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
-                (
-                    teacher,
-                    course,
-                    section,
-                    selected_ids.current["Teacher_ID"],
-                    selected_ids.current["CourseID"],
-                    selected_ids.current["SectionID"]
+        def confirm_update():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE enrollment SET Teacher_ID=%s, CourseID=%s, SectionID=%s WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
+                    (
+                        teacher,
+                        course,
+                        section,
+                        selected_ids.current["Teacher_ID"],
+                        selected_ids.current["CourseID"],
+                        selected_ids.current["SectionID"]
+                    )
                 )
-            )
-            conn.commit()
-            conn.close()
-            show_message("Enrollment updated successfully!")
-            logging.info(f"Updated enrollment: Teacher {teacher}, Course {course}, Section {section}")
-            clear_form()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
-            page.update()
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Enrollment updated successfully!", is_success=True)
+                logging.info(f"Updated enrollment: Teacher {teacher}, Course {course}, Section {section}")
+                clear_form()
+            except mysql.connector.Error as err:
+                logging.error(f"Database error: {err}")
+                show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
+                page.update()
+
+        show_confirm_dialog("Confirm Update", "Are you sure you want to update this enrollment?", confirm_update)
 
     def delete_enrollment(e):
         logging.debug("Delete button clicked")
@@ -338,26 +370,31 @@ def main(page: ft.Page):
             logging.warning("Delete failed: No enrollment selected")
             page.update()
             return
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute(
-                "DELETE FROM enrollment WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
-                (
-                    selected_ids.current["Teacher_ID"],
-                    selected_ids.current["CourseID"],
-                    selected_ids.current["SectionID"]
+
+        def confirm_delete():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM enrollment WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
+                    (
+                        selected_ids.current["Teacher_ID"],
+                        selected_ids.current["CourseID"],
+                        selected_ids.current["SectionID"]
+                    )
                 )
-            )
-            conn.commit()
-            conn.close()
-            show_message("Enrollment deleted successfully!")
-            logging.info(f"Deleted enrollment: Teacher {selected_ids.current['Teacher_ID']}, Course {selected_ids.current['CourseID']}, Section {selected_ids.current['SectionID']}")
-            clear_form()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
-            page.update()
+                conn.commit()
+                conn.close()
+                reset_field_borders()
+                show_alert_dialog("Success", "Enrollment deleted successfully!", is_success=True)
+                logging.info(f"Deleted enrollment: Teacher {selected_ids.current['Teacher_ID']}, Course {selected_ids.current['CourseID']}, Section {selected_ids.current['SectionID']}")
+                clear_form()
+            except mysql.connector.Error as err:
+                logging.error(f"Database error: {err}")
+                show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
+                page.update()
+
+        show_confirm_dialog("Confirm Delete", "Are you sure you want to delete this enrollment?", confirm_delete)
 
     add_btn = ft.ElevatedButton(
         text="Add Enrollment",
