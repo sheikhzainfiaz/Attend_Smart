@@ -33,6 +33,7 @@ def main(page: ft.Page):
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
     page.padding = 0
+    page.scroll = ft.ScrollMode.AUTO
 
     # Custom colors
     primary_color = ft.colors.BLUE_600
