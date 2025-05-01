@@ -157,7 +157,7 @@ def main(page: ft.Page):
                     else:
                         # For teachers, get the name from the query result (second column)
                         teacher_name = result[1] if result[1] else "Teacher"  # Fallback if name is null
-                        das_show(page, teacher_name)
+                        teacher_dashboard(page, teacher_name)
                     return
                 else:
                     show_alert_dialog("Login Failed", "Incorrect password", is_error=True)
