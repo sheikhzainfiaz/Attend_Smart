@@ -1,7 +1,7 @@
 import flet as ft
 import mysql.connector
 from Dash import show_main
-from teacher_dash import das_show
+from teacher_dash import teacher_dashboard
 
 def main(page: ft.Page):
     page.title = "Login - Face Recognition System"
