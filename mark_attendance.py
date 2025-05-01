@@ -11,38 +11,51 @@ import os
 import platform
 import cvzone
 import pyttsx3
+import threading
+import time
 
 # Constants
 ENCODE_FILE = "EncodeFile.p"
-FACE_DISTANCE_THRESHOLD = 0.6  # Increased to allow more matches
-SOUND_FILE = "beep.wav"  # Optional: Provide a .wav file for non-Windows systems
+FACE_DISTANCE_THRESHOLD = 0.6
+SOUND_FILE = "beep.wav"
+CAMERA_TIMEOUT = 300  # Timeout in seconds (5 minutes)
 
 # Initialize TTS engine
 tts_engine = pyttsx3.init()
-tts_engine.setProperty('rate', 150)  # Slower speech
+tts_engine.setProperty('rate', 150)
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def play_beep_sound():
-    if platform.system() == "Windows":
-        winsound.Beep(1000, 200)  # Frequency 1000 Hz, duration 200 ms
-    else:
-        try:
+    logging.debug("Starting play_beep_sound")
+    try:
+        if platform.system() == "Windows":
+            winsound.Beep(1000, 200)
+        else:
             if os.path.exists(SOUND_FILE):
-                os.system(f"aplay {SOUND_FILE}")  # Linux (requires aplay)
+                os.system(f"aplay {SOUND_FILE}")
             else:
                 logging.warning("Sound file not found for non-Windows system.")
-        except Exception as e:
-            logging.error(f"Failed to play sound: {str(e)}")
+        logging.debug("Finished play_beep_sound")
+    except Exception as e:
+        logging.error(f"Failed to play sound: {str(e)}")
 
 def play_tts_message(message):
+    logging.debug(f"Starting play_tts_message: {message}")
     try:
         tts_engine.say(message)
         tts_engine.runAndWait()
+        logging.debug("Finished play_tts_message")
     except Exception as e:
         logging.error(f"Failed to play TTS message: {str(e)}")
 
-def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for standalone testing
-    # Configure logging
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+def run_in_thread(func, *args):
+    """Run a function in a separate thread to prevent blocking."""
+    thread = threading.Thread(target=func, args=args, daemon=True)
+    thread.start()
+
+def main(page: ft.Page, teacher_id=1):
     logging.debug("Starting mark attendance application")
 
     # Window settings
@@ -110,7 +123,20 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
         width=720,
     )
 
+    # Text control for status messages
+    status_text = ft.Text("", color=ft.colors.GREEN_400, size=16, text_align=ft.TextAlign.CENTER)
+
+    def clear_status_text():
+        status_text.value = ""
+        page.update()
+
+    def set_status_text(message, duration=3):
+        status_text.value = message
+        page.update()
+        threading.Timer(duration, clear_status_text).start()
+
     def fetch_teacher_courses():
+        logging.debug("Fetching teacher courses")
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
@@ -126,16 +152,18 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             conn.close()
             course_dropdown.options = [
                 ft.dropdown.Option(
-                    key=f"{course[0]}:{course[1]}",  # CourseID:SectionID
+                    key=f"{course[0]}:{course[1]}",
                     text=f"{course[2]} - {course[3]} (Section: {course[4]})"
                 ) for course in courses
             ]
             page.update()
+            logging.debug("Finished fetching teacher courses")
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
 
     def fetch_students(course_id, section_id):
+        logging.debug(f"Fetching students for CourseID {course_id}, SectionID {section_id}")
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
@@ -147,7 +175,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             cursor.execute(query, (section_id,))
             students = [row[0] for row in cursor.fetchall()]
             conn.close()
-            logging.debug(f"Fetched students for SectionID {section_id}: {students}")
+            logging.debug(f"Fetched students: {students}")
             return students
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -155,6 +183,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             return []
 
     def fetch_student_details(roll_no):
+        logging.debug(f"Fetching details for Roll No {roll_no}")
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
@@ -162,7 +191,9 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             result = cursor.fetchone()
             conn.close()
             if result:
-                return result[0], result[1]  # Roll_no, Name
+                logging.debug(f"Found student: {result}")
+                return result[0], result[1]
+            logging.debug(f"No student found for Roll No {roll_no}")
             return roll_no, "Unknown"
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -170,6 +201,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             return roll_no, "Unknown"
 
     def check_if_already_marked(roll_no, course_id, section_id, teacher_id):
+        logging.debug(f"Checking if attendance already marked for Roll No {roll_no}")
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
@@ -184,7 +216,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             cursor.execute(query, (roll_no, course_id, section_id, teacher_id))
             count = cursor.fetchone()[0]
             conn.close()
-            logging.debug(f"Checked if already marked for Roll No {roll_no}: {'Yes' if count > 0 else 'No'}")
+            logging.debug(f"Attendance marked: {'Yes' if count > 0 else 'No'}")
             return count > 0
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -192,106 +224,145 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
             return False
 
     def mark_attendance(roll_no, course_id, section_id, status, name):
+        logging.debug(f"Marking attendance for Roll No {roll_no}, Status: {status}")
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
-            now=datetime.now()
-            date=now.date()
-            time=now.time()
+            now = datetime.now()
+            date = now.date()
+            time = now.time()
             cursor.execute("""
                 INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
-                VALUES (%s, %s, %s, %s,%s, %s, %s)
-            """, (teacher_id, course_id, section_id, roll_no, date,time, status))
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (teacher_id, course_id, section_id, roll_no, date, time, status))
             conn.commit()
             conn.close()
             logging.info(f"Marked {status} for Roll No: {roll_no}")
             if status == "Present":
-                play_beep_sound()  # Play beep sound
-                play_tts_message(f"Attendance marked for {name}")  # Play TTS message
+                run_in_thread(play_beep_sound)  # Run in thread
+                run_in_thread(play_tts_message, f"Attendance marked for {name}")  # Run in thread
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
 
+    stop_camera = False
+
     def mark_attendance_with_camera(e):
+        nonlocal stop_camera
+        stop_camera = False
+        logging.debug("Starting mark_attendance_with_camera")
+
         if not course_dropdown.value:
             show_alert_dialog("Error", "Please select a course and section!")
+            logging.debug("No course selected")
             return
 
         course_id, section_id = map(int, course_dropdown.value.split(":"))
         present_students = set()
+        start_time = time.time()
 
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             show_alert_dialog("Error", "Could not open camera!")
+            logging.error("Camera could not be opened")
             return
 
-        while True:
+        # Add Stop Camera button
+        stop_button = ft.ElevatedButton(
+            text="Stop Camera",
+            on_click=lambda e: stop_camera_feed(),
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=12),
+                padding=ft.padding.symmetric(horizontal=20, vertical=15),
+                bgcolor=ft.colors.RED_600,
+                color=ft.colors.WHITE,
+            )
+        )
+        page.controls.append(stop_button)
+        page.update()
+
+        def stop_camera_feed():
+            nonlocal stop_camera
+            stop_camera = True
+            page.controls.remove(stop_button)
+            page.update()
+            logging.debug("Stop camera button clicked")
+
+        while not stop_camera:
+            # Check for timeout
+            if time.time() - start_time > CAMERA_TIMEOUT:
+                logging.warning("Camera loop timed out")
+                show_alert_dialog("Timeout", "Camera session timed out after 5 minutes.")
+                break
+
+            logging.debug("Reading camera frame")
             ret, frame = cap.read()
             if not ret:
                 show_alert_dialog("Error", "Failed to capture video frame!")
+                logging.error("Failed to capture video frame")
                 break
 
-            # Convert frame to RGB (no resizing for better detection)
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Resize frame for faster processing
+            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
-            # Find faces in the frame
+            logging.debug("Detecting faces")
             face_locations = face_recognition.face_locations(rgb_frame)
             face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+            face_locations = [(top*4, right*4, bottom*4, left*4) for (top, right, bottom, left) in face_locations]
 
             logging.debug(f"Detected {len(face_locations)} faces in the frame")
 
             for face_encoding, (top, right, bottom, left) in zip(face_encodings, face_locations):
-                # Compare with known encodings
+                logging.debug("Processing face encoding")
                 matches = face_recognition.compare_faces(encode_list_known, face_encoding, tolerance=FACE_DISTANCE_THRESHOLD)
                 face_distances = face_recognition.face_distance(encode_list_known, face_encoding)
                 best_match_index = np.argmin(face_distances)
 
-                # Prepare bounding box for cvzone
                 bbox = (left, top, right - left, bottom - top)
                 label = "Unknown"
-                color = (0, 0, 255)  # Red for unrecognized
+                color = (0, 0, 255)
 
                 if matches[best_match_index]:
                     roll_no = roll_numbers[best_match_index]
                     logging.debug(f"Match found: Roll No {roll_no}, Distance: {face_distances[best_match_index]}")
-                    # Verify the student belongs to the selected section
                     students_in_section = fetch_students(course_id, section_id)
                     if roll_no in students_in_section:
-                        # Fetch student details only if in section
                         roll_no, name = fetch_student_details(roll_no)
                         label = f"ID: {roll_no} ({name})"
-                        color = (0, 255, 0)  # Green for recognized and in section
+                        color = (0, 255, 0)
                         if roll_no not in present_students:
-                            # Check if already marked today for this course and teacher
                             if not check_if_already_marked(roll_no, course_id, section_id, teacher_id):
                                 present_students.add(roll_no)
+                                logging.debug(f"Marking attendance for Roll No {roll_no}")
                                 mark_attendance(roll_no, course_id, section_id, "Present", name)
-                                show_alert_dialog("Success", f"Marked Present for Roll No: {roll_no}")
+                                set_status_text(f"Marked Present for Roll No: {roll_no}")
                             else:
-                                logging.debug(f"Roll No {roll_no} already marked today, skipping.")
+                                logging.debug(f"Roll No {roll_no} already marked today")
                     else:
-                        logging.debug(f"Student {roll_no} not enrolled in this section (SectionID: {section_id})")
-                        # Treat as Unknown, do not fetch or display details
+                        logging.debug(f"Roll No {roll_no} not in section {section_id}")
                         label = "Unknown"
-                        color = (0, 0, 255)  # Red for recognized but not in section
+                        color = (0, 0, 255)
                 else:
-                    logging.debug("No match found for detected face")
+                    logging.debug("No match found for face")
 
-                # Draw cornered rectangle and text using cvzone
                 cvzone.cornerRect(frame, bbox, rt=0, colorR=color)
                 x, y, w, h = bbox
                 cvzone.putTextRect(frame, label, (x, y - 20), scale=1, thickness=2, colorR=color)
 
-            # Display the video feed
+            logging.debug("Displaying frame")
             cv2.imshow("Face Recognition Attendance", frame)
 
-            # Break the loop if 'q' is pressed
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+                logging.debug("Quit key pressed")
+                stop_camera = True
 
-        # Release the camera and close windows
+        logging.debug("Releasing camera")
         cap.release()
         cv2.destroyAllWindows()
+        page.controls.remove(stop_button)
+        page.update()
+        logging.debug("Camera loop ended")
 
     # Mark Attendance button
     mark_button = ft.ElevatedButton(
@@ -335,6 +406,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
                             alignment=ft.MainAxisAlignment.CENTER,
                             spacing=10,
                         ),
+                        status_text,
                     ],
                     spacing=15,
                 ),
