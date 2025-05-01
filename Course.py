@@ -20,6 +20,34 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
+    def show_alert_dialog(title, message, is_error=False):
+        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
+        try:
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(title),
+                content=ft.Text(message),
+                actions=[
+                    ft.TextButton("OK", on_click=lambda e: close_dialog())
+                ],
+                actions_alignment=ft.MainAxisAlignment.END
+            )
+
+            def close_dialog():
+                logging.debug("Closing AlertDialog")
+                dialog.open = False
+                page.update()
+
+            page.overlay.append(dialog)
+            dialog.open = True
+            logging.debug("Dialog added to overlay, calling page.update()")
+            page.update()
+            logging.debug("AlertDialog should now be visible")
+        except Exception as ex:
+            logging.error(f"Error displaying dialog: {ex}")
+            page.add(ft.Text(f"Error: {ex}"))
+            page.update()
+
     def show_message(message, is_error=False):
         page.snack_bar = ft.SnackBar(
             content=ft.Text(
@@ -180,7 +208,6 @@ def main(page: ft.Page):
             conn.close()
             if c:
                 course_code.value, course_name.value, credit_hours.value = c[0], c[1], str(c[2])
-                show_message("Course selected for editing")
                 logging.debug("Form populated with selected course data")
             page.update()
         except mysql.connector.Error as err:
@@ -189,22 +216,38 @@ def main(page: ft.Page):
             page.update()
 
     def add_course(e):
-        if not all([course_code.value.strip(), course_name.value.strip(), credit_hours.value]):
-            show_message("All fields are required!", is_error=True)
-            logging.warning("Add failed: Missing required fields")
+        logging.debug("Add Course button clicked")
+        code = course_code.value.strip() if course_code.value else ""
+        name = course_name.value.strip() if course_name.value else ""
+        credits = credit_hours.value
+
+        # Validate fields
+        missing_fields = []
+        if not code:
+            missing_fields.append("Course Code")
+        if not name:
+            missing_fields.append("Course Name")
+        if not credits:
+            missing_fields.append("Credit Hours")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Add failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO course (CourseCode, CourseName, CreditHours) VALUES (%s, %s, %s)",
-                (course_code.value, course_name.value, credit_hours.value)
+                (code, name, credits)
             )
             conn.commit()
             conn.close()
             show_message("Course added successfully!")
-            logging.info(f"Added course: {course_code.value} - {course_name.value}")
+            logging.info(f"Added course: {code} - {name}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -212,27 +255,44 @@ def main(page: ft.Page):
             page.update()
 
     def update_course(e):
+        logging.debug("Update button clicked")
         if not selected_id.current:
-            show_message("Please select a course to update!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a course to update!", is_error=True)
             logging.warning("Update failed: No course selected")
             page.update()
             return
-        if not all([course_code.value.strip(), course_name.value.strip(), credit_hours.value]):
-            show_message("All fields are required!", is_error=True)
-            logging.warning("Update failed: Missing required fields")
+
+        code = course_code.value.strip() if course_code.value else ""
+        name = course_name.value.strip() if course_name.value else ""
+        credits = credit_hours.value
+
+        # Validate fields
+        missing_fields = []
+        if not code:
+            missing_fields.append("Course Code")
+        if not name:
+            missing_fields.append("Course Name")
+        if not credits:
+            missing_fields.append("Credit Hours")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Update failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE course SET CourseCode=%s, CourseName=%s, CreditHours=%s WHERE CourseID=%s",
-                (course_code.value, course_name.value, credit_hours.value, selected_id.current)
+                (code, name, credits, selected_id.current)
             )
             conn.commit()
             conn.close()
             show_message("Course updated successfully!")
-            logging.info(f"Updated course: {course_code.value} - {course_name.value}")
+            logging.info(f"Updated course: {code} - {name}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -240,8 +300,9 @@ def main(page: ft.Page):
             page.update()
 
     def delete_course(e):
+        logging.debug("Delete button clicked")
         if not selected_id.current:
-            show_message("Please select a course to delete!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a course to delete!", is_error=True)
             logging.warning("Delete failed: No course selected")
             page.update()
             return
@@ -380,9 +441,7 @@ def main(page: ft.Page):
         ),
         animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
         scale=ft.transform.Scale(scale=1.0),
-        on_hover=lambda e: e.control.update(
-            scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
-        ),
+        on_hover=lambda e: card.update(scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0))
     )
 
     background = ft.Container(

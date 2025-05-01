@@ -20,20 +20,33 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_message(message, is_error=False):
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text(
-                message,
-                color=ft.colors.WHITE,
-                weight=ft.FontWeight.W_500,
-                size=14,
-            ),
-            bgcolor=ft.colors.RED_600 if is_error else ft.colors.GREEN_600,
-            duration=3000,
-            padding=10,
-        )
-        page.snack_bar.open = True
-        page.update()
+    def show_alert_dialog(title, message, is_error=False):
+        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
+        try:
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(title),
+                content=ft.Text(message),
+                actions=[
+                    ft.TextButton("OK", on_click=lambda e: close_dialog())
+                ],
+                actions_alignment=ft.MainAxisAlignment.END
+            )
+
+            def close_dialog():
+                logging.debug("Closing AlertDialog")
+                dialog.open = False
+                page.update()
+
+            page.overlay.append(dialog)
+            dialog.open = True
+            logging.debug("Dialog added to overlay, calling page.update()")
+            page.update()
+            logging.debug("AlertDialog should now be visible")
+        except Exception as ex:
+            logging.error(f"Error displaying dialog: {ex}")
+            page.add(ft.Text(f"Error: {ex}"))
+            page.update()
 
     name = ft.TextField(
         label="Section Name",
@@ -47,7 +60,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720,  # Match the content width of the card (800 - 40 padding on each side)
+        width=720,
     )
     semester = ft.Dropdown(
         label="Semester",
@@ -71,7 +84,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720,  # Match the width of other text fields
+        width=720,
     )
     department = ft.TextField(
         label="Department",
@@ -85,7 +98,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720,  # Match the width of other fields
+        width=720,
     )
 
     search_field = ft.TextField(
@@ -101,7 +114,7 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         on_change=lambda e: update_table(e.control.value.strip()),
-        width=720,  # Match the width of other fields
+        width=720,
     )
 
     data_table = ft.DataTable(
@@ -147,7 +160,7 @@ def main(page: ft.Page):
             return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error fetching sections: {err}", is_error=True)
             return []
 
     def update_table(search_term=""):
@@ -178,79 +191,113 @@ def main(page: ft.Page):
             conn.close()
             if s:
                 name.value, semester.value, department.value = s
-                show_message("Section selected for editing")
                 logging.debug("Form populated with selected section data")
             page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error selecting section: {err}", is_error=True)
             page.update()
 
     def add_section(e):
-        if not all([name.value.strip(), semester.value, department.value.strip()]):
-            show_message("All fields are required!", is_error=True)
-            logging.warning("Add failed: Missing required fields")
+        logging.debug("Add Section button clicked")
+        section_name = name.value.strip() if name.value else ""
+        sem = semester.value
+        dept = department.value.strip() if department.value else ""
+
+        # Validate fields
+        missing_fields = []
+        if not section_name:
+            missing_fields.append("Section Name")
+        if not sem:
+            missing_fields.append("Semester")
+        if not dept:
+            missing_fields.append("Department")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Add failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO section (Name, Semester, Department) VALUES (%s, %s, %s)",
-                           (name.value, semester.value, department.value))
+                           (section_name, sem, dept))
             conn.commit()
             conn.close()
-            show_message("Section added successfully!")
-            logging.info(f"Added section: {name.value}")
+            show_alert_dialog("Success", "Section added successfully!")
+            logging.info(f"Added section: {section_name}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error adding section: {err}", is_error=True)
             page.update()
 
     def update_section(e):
+        logging.debug("Update button clicked")
         if not selected_id.current:
-            show_message("Please select a section to update!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a section to update!", is_error=True)
             logging.warning("Update failed: No section selected")
             page.update()
             return
-        if not all([name.value.strip(), semester.value, department.value.strip()]):
-            show_message("All fields are required!", is_error=True)
-            logging.warning("Update failed: Missing required fields")
+
+        section_name = name.value.strip() if name.value else ""
+        sem = semester.value
+        dept = department.value.strip() if department.value else ""
+
+        # Validate fields
+        missing_fields = []
+        if not section_name:
+            missing_fields.append("Section Name")
+        if not sem:
+            missing_fields.append("Semester")
+        if not dept:
+            missing_fields.append("Department")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Update failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute("UPDATE section SET Name=%s, Semester=%s, Department=%s WHERE SectionID=%s",
-                           (name.value, semester.value, department.value, selected_id.current))
+                           (section_name, sem, dept, selected_id.current))
             conn.commit()
             conn.close()
-            show_message("Section updated successfully!")
-            logging.info(f"Updated section: {name.value}")
+            show_alert_dialog("Success", "Section updated successfully!")
+            logging.info(f"Updated section: {section_name}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error updating section: {err}", is_error=True)
             page.update()
 
     def delete_section(e):
+        logging.debug("Delete button clicked")
         if not selected_id.current:
-            show_message("Please select a section to delete!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a section to delete!", is_error=True)
             logging.warning("Delete failed: No section selected")
             page.update()
             return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute("DELETE FROM section WHERE SectionID=%s", (selected_id.current,))
             conn.commit()
             conn.close()
-            show_message("Section deleted successfully!")
+            show_alert_dialog("Success", "Section deleted successfully!")
             logging.info(f"Deleted section: {selected_id.current}")
             clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error deleting section: {err}", is_error=True)
             page.update()
 
     add_btn = ft.ElevatedButton(
@@ -371,11 +418,6 @@ def main(page: ft.Page):
             blur_radius=30,
             spread_radius=5,
             color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
-        ),
-        animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-        scale=ft.transform.Scale(scale=1.0),
-        on_hover=lambda e: e.control.update(
-            scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
         ),
     )
 
