@@ -3,6 +3,7 @@ import mysql.connector
 import logging
 import cv2
 import os
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -43,28 +44,60 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
+
+    # Function to show AlertDialog
+    def show_alert_dialog(title, message, is_error=False):
+        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
+        try:
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(title),
+                content=ft.Text(message),
+                actions=[
+                    ft.TextButton("OK", on_click=lambda e: close_dialog())
+                ],
+                actions_alignment=ft.MainAxisAlignment.END
+            )
+
+            def close_dialog():
+                logging.debug("Closing AlertDialog")
+                dialog.open = False
+                page.update()
+
+            page.overlay.append(dialog)
+            dialog.open = True
+            logging.debug("Dialog added to overlay, calling page.update()")
+            page.update()
+            logging.debug("AlertDialog should now be visible")
+        except Exception as ex:
+            logging.error(f"Error displaying dialog: {ex}")
+            page.add(ft.Text(f"Error: {ex}"))
+            page.update()
+
+    # Function to capture photos
     def take_photo_and_save(roll_number):
         """Capture up to 5 photos and overwrite in a loop using the roll_number as folder."""
         if not roll_number:
-        
-            return
+            show_alert_dialog("Error", "Enter roll number before taking a photo!", is_error=True)
+            return None
 
         save_path = os.path.join("photos", roll_number)
         os.makedirs(save_path, exist_ok=True)
 
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            
-            return
+            show_alert_dialog("Error", "Failed to open camera!", is_error=True)
+            logging.error("Camera could not be opened")
+            return None
 
         count = 1
         max_photos = 5
-        
 
-        while True:
+        while count <= max_photos:
             success, img = cap.read()
             if not success:
-                
+                show_alert_dialog("Error", "Failed to capture image!", is_error=True)
+                logging.error("Failed to capture image")
                 break
 
             cv2.imshow("Take Photo", img)
@@ -84,35 +117,20 @@ def main(page: ft.Page):
                 # Save image with overwrite logic
                 filename = os.path.join(save_path, f"{roll_number}_{count}.jpg")
                 cv2.imwrite(filename, square_img)
-                print(f"Saved {filename}")
-
+                logging.debug(f"Saved {filename}")
                 count += 1
-                if count > max_photos:
-                    break # Restart overwriting
 
             elif key == ord('q'):  # Quit on 'q'
-                
                 break
 
         cap.release()
         cv2.destroyAllWindows()
 
-
-    # Function to show SnackBar messages
-    def show_message(message, is_error=False):
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text(
-                message,
-                color=ft.colors.WHITE,
-                weight=ft.FontWeight.W_500,
-                size=14,
-            ),
-            bgcolor=ft.colors.RED_600 if is_error else ft.colors.GREEN_600,
-            duration=3000,  # Display for 3 seconds
-            padding=10,
-        )
-        page.snack_bar.open = True
-        page.update()
+        if count > 1:  # At least one photo was saved
+            return filename
+        else:
+            show_alert_dialog("Warning", "No photos were saved!", is_error=True)
+            return None
 
     # Form fields
     roll_no = ft.TextField(
@@ -142,10 +160,10 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
     )
-    
+
     # Fetch sections from the database
     sections = get_sections_from_db()
-    
+
     # Dropdown for section_id
     section_id = ft.Dropdown(
         label="Section",
@@ -190,7 +208,7 @@ def main(page: ft.Page):
         width=750,
     )
 
-    # Search field (updated for responsive search)
+    # Search field
     search_field = ft.TextField(
         label="Search Students",
         hint_text="Search by name, roll number, or section ID",
@@ -203,7 +221,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        on_change=lambda e: update_table(e.control.value.strip()),  # Update table as user types
+        on_change=lambda e: update_table(e.control.value.strip()),
     )
 
     # DataTable
@@ -240,7 +258,6 @@ def main(page: ft.Page):
             cursor = conn.cursor()
             query = "SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student"
             if search_term:
-                # Search across Roll_no, Full_Name, and SectionID
                 query += " WHERE Full_Name LIKE %s OR Roll_no LIKE %s OR SectionID LIKE %s"
                 cursor.execute(query, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
             else:
@@ -251,7 +268,7 @@ def main(page: ft.Page):
             return rows
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error fetching students: {err}", is_error=True)
             return []
 
     def update_table(search_term=""):
@@ -294,23 +311,38 @@ def main(page: ft.Page):
                 full_name.value = student[1]
                 section_id.value = str(student[2])
                 photo_sample.value = student[3]
-                show_message("Student selected for editing")
+                show_alert_dialog("Success", "Student selected for editing")
                 logging.debug("Form populated with selected student data")
+            else:
+                show_alert_dialog("Error", "Student not found!", is_error=True)
             page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
             page.update()
 
     def add_click(e):
-        roll = roll_no.value.strip()
-        name = full_name.value.strip()
+        logging.debug("Add button clicked")
+        roll = roll_no.value.strip() if roll_no.value else ""
+        name = full_name.value.strip() if full_name.value else ""
         section = section_id.value
         photo = photo_sample.value
 
-        if not roll or not name or not section:
-            show_message("Roll Number, Full Name, and Section are required!", is_error=True)
-            logging.warning("Add failed: Missing required fields")
+        # Validate all fields
+        missing_fields = []
+        if not roll:
+            missing_fields.append("Roll Number")
+        if not name:
+            missing_fields.append("Full Name")
+        if not section:
+            missing_fields.append("Section")
+        if not photo:
+            missing_fields.append("Photo Sample")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Add failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
 
@@ -329,30 +361,43 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            show_message("Student added successfully!")
+            show_alert_dialog("Success", "Student added successfully!")
             logging.info(f"Added student: {roll}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error adding student: {err}", is_error=True)
             page.update()
 
     def update_click(e):
+        logging.debug("Update button clicked")
         if not selected_roll_no.current:
-            show_message("Please select a student to update!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a student to update!", is_error=True)
             logging.warning("Update failed: No student selected")
             page.update()
             return
         
-        roll = roll_no.value.strip()
-        name = full_name.value.strip()
+        roll = roll_no.value.strip() if roll_no.value else ""
+        name = full_name.value.strip() if full_name.value else ""
         section = section_id.value
         photo = photo_sample.value
 
-        if not roll or not name or not section:
-            show_message("Roll Number, Full Name, and Section are required!", is_error=True)
-            logging.warning("Update failed: Missing required fields")
+        # Validate all fields
+        missing_fields = []
+        if not roll:
+            missing_fields.append("Roll Number")
+        if not name:
+            missing_fields.append("Full Name")
+        if not section:
+            missing_fields.append("Section")
+        if not photo:
+            missing_fields.append("Photo Sample")
+
+        if missing_fields:
+            error_message = f"Missing: {', '.join(missing_fields)}"
+            logging.warning(f"Update failed: {error_message}")
+            show_alert_dialog("Validation Error", error_message, is_error=True)
             page.update()
             return
 
@@ -371,18 +416,19 @@ def main(page: ft.Page):
             )
             conn.commit()
             conn.close()
-            show_message("Student updated successfully!")
+            show_alert_dialog("Success", "Student updated successfully!")
             logging.info(f"Updated student: {roll}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error updating student: {err}", is_error=True)
             page.update()
 
     def delete_click(e):
+        logging.debug("Delete button clicked")
         if not selected_roll_no.current:
-            show_message("Please select a student to delete!", is_error=True)
+            show_alert_dialog("Validation Error", "Please select a student to delete!", is_error=True)
             logging.warning("Delete failed: No student selected")
             page.update()
             return
@@ -399,28 +445,28 @@ def main(page: ft.Page):
             cursor.execute("DELETE FROM student WHERE Roll_no=%s", (selected_roll_no.current,))
             conn.commit()
             conn.close()
-            show_message("Student deleted successfully!")
+            show_alert_dialog("Success", "Student deleted successfully!")
             logging.info(f"Deleted student: {selected_roll_no.current}")
             clear_form()
             update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            show_alert_dialog("Database Error", f"Error deleting student: {err}", is_error=True)
             page.update()
 
     def take_photo_click(e):
-        
-        roll = roll_no.value.strip()
+        logging.debug("Take Photo button clicked")
+        roll = roll_no.value.strip() if roll_no.value else ""
         if not roll:
-            show_message("Enter roll number before taking a photo!", is_error=True)
+            show_alert_dialog("Validation Error", "Enter roll number before taking a photo!", is_error=True)
+            logging.warning("Take photo failed: No roll number provided")
             return
 
         filename = take_photo_and_save(roll)
         if filename:
-            show_message("Photo captured and saved!")
+            show_alert_dialog("Success", "Photo captured and saved!")
             photo_sample.value = "Yes"
             page.update()
-
 
     def clear_form():
         roll_no.value = ""
@@ -428,9 +474,9 @@ def main(page: ft.Page):
         section_id.value = None
         photo_sample.value = None
         selected_roll_no.current = None
-        search_field.value = ""  # Clear search field
+        search_field.value = ""
         logging.debug("Form cleared")
-        update_table()  # Refresh table to show all students
+        update_table()
         page.update()
 
     # Buttons
@@ -516,11 +562,10 @@ def main(page: ft.Page):
     logging.debug("Loading initial table data")
     update_table()
 
-    # Card container (removed status_text)
+    # Card container
     card = ft.Container(
         content=ft.Column(
-            [   
-                
+            [
                 ft.Text(
                     "Student Management",
                     size=28,
@@ -550,7 +595,7 @@ def main(page: ft.Page):
                     spacing=15,
                 ),
                 ft.Divider(height=20, color=ft.colors.TRANSPARENT),
-                search_field,  # Just the search field, no button
+                search_field,
                 ft.Container(
                     content=ft.Column(
                         [data_table],
@@ -574,11 +619,6 @@ def main(page: ft.Page):
             blur_radius=30,
             spread_radius=5,
             color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
-        ),
-        animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-        scale=ft.transform.Scale(scale=1.0),
-        on_hover=lambda e: e.control.update(
-            scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
         ),
     )
 
