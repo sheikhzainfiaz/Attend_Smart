@@ -17,6 +17,22 @@ def open_teacher_details(page: ft.Page):
     import teacher
     teacher.main(page)
     
+def open_course_details(page: ft.Page):
+    page.controls.clear()
+    import Course
+    Course.main(page)
+    
+def open_section_details(page: ft.Page):
+    page.controls.clear()
+    import Section
+    Section.main(page)
+
+def open_enrollment_details(page: ft.Page):
+    page.controls.clear()
+    import Enrollment
+    Enrollment.main(page)
+    
+    
 def show_main(page: ft.Page):
     logging.debug("Starting main function")
     page.title = "Face Recognition System"
@@ -127,18 +143,20 @@ def show_main(page: ft.Page):
             )
 
             button_data_row1 = [
-                ("Student Details", ft.icons.PERSON, lambda e: open_student_details(page)),
-                ("Face Detection", ft.icons.CAMERA, lambda e: show_sub_page("Face Detection")),
-                ("Attendance", ft.icons.EVENT, lambda e: show_sub_page("Attendance")),
-                ("Teacher Details", ft.icons.PEOPLE, lambda e: open_teacher_details(page)),
-            ]
-
+    ("Train Data", ft.Icons.TRAIN, lambda e: show_sub_page("Train Data")),
+    ("Face Detection", ft.Icons.FACE, lambda e: show_sub_page("Face Detection")),
+    ("Student Details", ft.Icons.PERSON, lambda e: open_student_details(page)),
+    ("Teacher Details", ft.Icons.PERSON_OUTLINE, lambda e: open_teacher_details(page)),
+    ("Course Details", ft.Icons.BOOK, lambda e: open_course_details(page)),
+]
+            
             button_data_row2 = [
-                ("Train Data", ft.icons.FLASH_ON, lambda e: show_sub_page("Train Data")),
-                ("Photos", ft.icons.PHOTO_LIBRARY, lambda e: open_images()),
-                ("Developer", ft.icons.CODE, lambda e: show_sub_page("Developer")),
-                ("Exit", ft.icons.EXIT_TO_APP, lambda e: page.window_close()),
-            ]
+    ("Section Details", ft.Icons.VIEW_LIST, lambda e: open_section_details(page)),
+    ("Enrollment Details", ft.Icons.HOW_TO_REG, lambda e: open_enrollment_details(page)),
+    ("Photos", ft.Icons.PHOTO_LIBRARY, lambda e: open_images()),
+    ("Developer", ft.Icons.CODE, lambda e: show_sub_page("Developer")),
+    ("Exit", ft.Icons.EXIT_TO_APP, lambda e: page.window_close()),
+]
 
             buttons_row1 = []
             buttons_row2 = []

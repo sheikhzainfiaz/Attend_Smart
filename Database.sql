@@ -3,15 +3,13 @@ DROP DATABASE IF EXISTS face_db;
 CREATE DATABASE face_db;
 USE face_db;
 
--- 2. Admin Table
-CREATE TABLE admin (
+-- Insert default admin credentials
+CREATE TABLE admins (
     Admin_ID INT AUTO_INCREMENT PRIMARY KEY,
     Username VARCHAR(50) UNIQUE NOT NULL,
     Password VARCHAR(100) NOT NULL
 );
-
--- Insert default admin credentials
-INSERT INTO admin (Username, Password) VALUES ('admin', 'admin');
+INSERT INTO admins (Username, Password) VALUES ('admin', 'admin');
 
 -- 3. Teachers
 CREATE TABLE teachers (
@@ -167,10 +165,4 @@ WHERE t.Full_Name = 'Kasloom'
   AND sec.Name = 'SEA'
   AND DATE(a.Attendance_Timestamp) = '2025-04-30';
 
-
-CREATE TABLE admins (
-    Admin_ID INT AUTO_INCREMENT PRIMARY KEY,
-    Username VARCHAR(50) UNIQUE NOT NULL,
-    Password VARCHAR(100) NOT NULL
-);
 

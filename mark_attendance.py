@@ -54,7 +54,7 @@ def main(page: ft.Page, teacher_id=1):  # Default teacher_id=1 (Kasloom) for sta
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
     page.padding = 0
-    page.scroll = ft.ScrollMode.AUTO
+    page.scroll = None
 
     # Colors
     primary_color = ft.colors.BLUE_600
