@@ -13,6 +13,21 @@ def open_student_details(page: ft.Page):
     import Student  # This imports the student.py script
     Student.main(page)
 
+def open_course_details(page: ft.Page):
+    page.controls.clear()
+    import Course
+    Course.main(page)
+    
+def open_section_details(page: ft.Page):
+    page.controls.clear()
+    import Section
+    Section.main(page)
+
+def open_enrollment_details(page: ft.Page):
+    page.controls.clear()
+    import Enrollment
+    Enrollment.main(page)
+    
 def open_teacher_details(page: ft.Page):
     page.controls.clear()
     import teacher
@@ -122,15 +137,19 @@ def show_main(page: ft.Page):
             )
 
             button_data_row1 = [
+                ("Train Data", ft.Icons.TRAIN, lambda e: show_sub_page("Train Data")),
+                ("Face Detection", ft.Icons.CAMERA, lambda e: show_sub_page("Face Detection")),
                 ("Student Details", ft.icons.PERSON, lambda e: open_student_details(page)),
-                ("Face Detection", ft.icons.CAMERA, lambda e: show_sub_page("Face Detection")),
-                ("Attendance", ft.icons.EVENT, lambda e: show_sub_page("Attendance")),
                 ("Teacher Details", ft.icons.PEOPLE, lambda e: open_teacher_details(page)),
+                ("Course Details", ft.icons.GOLF_COURSE, lambda e: open_course_details(page)),
+                
+                
             ]
 
             button_data_row2 = [
-                ("Train Data", ft.icons.FLASH_ON, lambda e: show_sub_page("Train Data")),
-                ("Photos", ft.icons.PHOTO_LIBRARY, lambda e: open_images()),
+                ("Section Details", ft.icons.EVENT, lambda e: open_section_details(page)),
+                ("Enrollemnt Details", ft.icons.FLASH_ON, lambda e: open_enrollment_details(page)),
+                ("Photos", ft.Icons.PHOTO_LIBRARY, lambda e: open_images()),
                 ("Developer", ft.icons.CODE, lambda e: show_sub_page("Developer")),
                 ("Exit", ft.icons.EXIT_TO_APP, lambda e: page.window_close()),
             ]
