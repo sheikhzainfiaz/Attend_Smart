@@ -2,6 +2,7 @@ import flet as ft
 import mysql.connector
 import logging
 from datetime import datetime
+import re
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -68,44 +69,52 @@ def main_manage(page: ft.Page,teacher_id=1):
         on_change=lambda e: update_table()
     )
 
-    # Date picker
+    # Date input
     selected_date = ft.Ref[str]()
-    selected_date.current = datetime.now().strftime("%Y-%m-%d")
-    
-    date_picker = ft.DatePicker(
-        on_change=lambda e: update_selected_date(e.control.value),
-        first_date=datetime(2023, 1, 1),
-        last_date=datetime(2025, 12, 31),
-        value=datetime.now()
-    )
-    page.overlay.append(date_picker)
+    selected_date.current = datetime.now().strftime("%Y-%m-%d")  # Today's date (2025-05-01)
 
-    date_button = ft.ElevatedButton(
-        "Select Date",
-        icon=ft.icons.CALENDAR_TODAY,
-        on_click=lambda e: date_picker.open(),
-        bgcolor=ft.colors.BLUE_800,
-        color=ft.colors.WHITE,
-        style=ft.ButtonStyle(
-            padding=ft.padding.symmetric(horizontal=15, vertical=10),
-            text_style=ft.TextStyle(size=14)
-        )
-    )
-
-    date_display = ft.Text(
+    date_input = ft.TextField(
+        label="Select Date (YYYY-MM-DD)",
         value=selected_date.current,
-        color=ft.colors.WHITE,
-        size=14
+        border_color=accent_color,
+        focused_border_color=primary_color,
+        filled=True,
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        border_radius=10,
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        on_submit=lambda e: update_selected_date(e.control.value)
     )
 
     def update_selected_date(date_value):
-        if date_value:
-            selected_date.current = date_value.strftime("%Y-%m-%d")
-            date_display.value = selected_date.current
-            update_table()
+        logging.debug(f"Date input changed to: {date_value}")
+        date_pattern = r"^\d{4}-\d{2}-\d{2}$"
+        if not date_value or not re.match(date_pattern, date_value):
+            show_alert_dialog("Invalid Date", "Please enter date in YYYY-MM-DD format (e.g., 2025-05-01).")
+            date_input.value = selected_date.current
             page.update()
+            return
+        
+        try:
+            year, month, day = map(int, date_value.split("-"))
+            datetime(year, month, day)
+            if year < 2023 or year > 2025:
+                show_alert_dialog("Invalid Date", "Please select a date between 2023 and 2025.")
+                date_input.value = selected_date.current
+                page.update()
+                return
+            
+            selected_date.current = date_value
+            date_input.value = selected_date.current
+            logging.debug(f"Date updated to: {selected_date.current}")
+            update_table()
+        except ValueError:
+            show_alert_dialog("Invalid Date", "Please enter a valid date (e.g., 2025-05-01).")
+            date_input.value = selected_date.current
+        page.update()
 
-    # Data table for students and attendance
+    # Data table for students and attendance (view-only)
     data_table = ft.DataTable(
         border=ft.Border(
             top=ft.BorderSide(1, ft.colors.BLUE_200),
@@ -174,14 +183,51 @@ def main_manage(page: ft.Page,teacher_id=1):
             show_alert_dialog("Error", f"Error fetching sections: {e}")
 
     def update_table():
-        data_table.rows = []
-        if not all([course_dropdown.value, section_dropdown.value, selected_date.current]):
+        logging.debug("Updating table...")
+        data_table.rows = []  # Clear existing rows
+
+        # Use date_input.value instead of selected_date.current
+        date_value = date_input.value
+        logging.debug(f"Fetching data for date: {date_value}")
+
+        # Validate the date before proceeding
+        date_pattern = r"^\d{4}-\d{2}-\d{2}$"
+        if not date_value or not re.match(date_pattern, date_value):
+            logging.debug("Invalid date format in date_input")
+            show_alert_dialog("Invalid Date", "Please enter date in YYYY-MM-DD format (e.g., 2025-05-01).")
+            date_input.value = selected_date.current
             page.update()
             return
+        
+        try:
+            year, month, day = map(int, date_value.split("-"))
+            datetime(year, month, day)
+            if year < 2023 or year > 2025:
+                logging.debug("Date out of range")
+                show_alert_dialog("Invalid Date", "Please select a date between 2023 and 2025.")
+                date_input.value = selected_date.current
+                page.update()
+                return
+        except ValueError:
+            logging.debug("Invalid date value")
+            show_alert_dialog("Invalid Date", "Please enter a valid date (e.g., 2025-05-01).")
+            date_input.value = selected_date.current
+            page.update()
+            return
+
+        # Synchronize selected_date.current with date_input.value
+        selected_date.current = date_value
+        logging.debug(f"Synchronized selected_date.current to: {selected_date.current}")
+
+        if not all([course_dropdown.value, section_dropdown.value]):
+            logging.debug("Missing required fields for table update (course or section).")
+            page.update()
+            return
+
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
-            cursor.execute("""
+            query = """
                 SELECT s.Roll_no, s.Full_Name, a.Status
                 FROM student s
                 LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
@@ -190,83 +236,42 @@ def main_manage(page: ft.Page,teacher_id=1):
                     AND a.SectionID = %s
                     AND a.Attendance_Date = %s
                 WHERE s.SectionID = %s
-            """, (DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, selected_date.current, section_dropdown.value))
+            """
+            params = (DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, date_value, section_dropdown.value)
+            logging.debug(f"Executing query: {query % params}")
+            cursor.execute(query, params)
             students = cursor.fetchall()
+            logging.debug(f"Fetched students: {students}")
             conn.close()
             
+            if not students:
+                logging.debug(f"No data found for date {date_value}")
+                show_alert_dialog("No Data", f"No attendance records found for {date_value}.")
+                page.update()
+                return
+            
             for roll_no, full_name, status in students:
-                status_text = status if status else "Absent"
+                status_text = status if status else "Not Recorded"
                 data_table.rows.append(
                     ft.DataRow(
                         cells=[
                             ft.DataCell(ft.Text(roll_no, color=ft.colors.WHITE)),
                             ft.DataCell(ft.Text(full_name, color=ft.colors.WHITE)),
-                            ft.DataCell(
-                                ft.Dropdown(
-                                    value=status_text,
-                                    options=[
-                                        ft.dropdown.Option("Present"),
-                                        ft.dropdown.Option("Absent")
-                                    ],
-                                    border_color=accent_color,
-                                    focused_border_color=primary_color,
-                                    filled=True,
-                                    bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-                                    text_style=ft.TextStyle(color=ft.colors.WHITE),
-                                    on_change=lambda e, rn=roll_no: update_attendance(rn, e.control.value)
-                                )
-                            ),
+                            ft.DataCell(ft.Text(status_text, color=ft.colors.WHITE)),
                         ]
                     )
                 )
+            logging.debug(f"Table updated with {len(data_table.rows)} rows")
             page.update()
         except Exception as e:
+            logging.debug(f"Error fetching data: {e}")
             show_alert_dialog("Error", f"Error fetching students: {e}")
-
-    def update_attendance(roll_no, status):
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            # Check if attendance record exists for the selected date
-            cursor.execute("""
-                SELECT AttendanceID FROM attendance
-                WHERE Roll_no = %s
-                AND Teacher_ID = %s
-                AND CourseID = %s
-                AND SectionID = %s
-                AND Attendance_Date = %s
-            """, (roll_no, DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, selected_date.current))
-            existing = cursor.fetchone()
-            
-            current_time = datetime.now().strftime("%H:%M:%S")
-            
-            if existing:
-                # Update existing record
-                cursor.execute("""
-                    UPDATE attendance
-                    SET Status = %s, Attendance_Time = %s
-                    WHERE AttendanceID = %s
-                """, (status, current_time, existing[0]))
-            else:
-                # Insert new record
-                cursor.execute("""
-                    INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, roll_no, selected_date.current, current_time, status))
-            
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", f"Attendance updated for {roll_no}")
-            update_table()
-        except Exception as e:
-            show_alert_dialog("Error", f"Error updating attendance: {e}")
 
     # Buttons
     btns = ft.Row([
-        date_button,
-        date_display,
+        date_input,
         ft.ElevatedButton(
-            "Refresh",
+            "Fetch",
             on_click=lambda e: update_table(),
             bgcolor=primary_color,
             color=ft.colors.WHITE,
@@ -319,3 +324,4 @@ def main_manage(page: ft.Page,teacher_id=1):
 
     page.add(background)
     update_course_dropdown()
+

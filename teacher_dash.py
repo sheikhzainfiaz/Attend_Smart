@@ -17,8 +17,8 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
-    page.padding = 0
-    page.scroll = ft.ScrollMode.AUTO
+    page.padding = 0  # Remove padding to eliminate extra space
+    page.scroll = None  # Disable scroll to prevent extra space
 
     # Colors
     primary_color = ft.colors.BLUE_600
@@ -87,6 +87,8 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
 
     def show_dummy_page(page_title):
         page.controls.clear()
+        page.update()
+
         card = ft.Container(
             content=ft.Column(
                 [
@@ -121,6 +123,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=15,
+                expand=True,  # Ensure the column takes up all available space
             ),
             padding=40,
             width=800,
@@ -141,7 +144,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
         background = ft.Container(
             content=card,
             alignment=ft.alignment.center,
-            expand=True,
+            expand=True,  # Ensure the container takes up the full page
             gradient=ft.RadialGradient(
                 center=ft.Alignment(0, 0),
                 radius=2.0,
@@ -158,10 +161,12 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
 
     def show_home_page():
         page.controls.clear()
+        page.update()
+
         button_data = [
-            ("Mark Attendance", ft.Icons.EVENT, lambda e: main(page,teacher_id)),
-            ("Manage Attendance", ft.Icons.LIST, lambda e: main_manage(page, teacher_id)),
-            ("Exit", ft.Icons.EXIT_TO_APP, lambda e: page.window_close()),
+            ("Mark Attendance", ft.icons.EVENT, lambda e: main(page, teacher_id)),
+            ("Manage Attendance", ft.icons.LIST, lambda e: main_manage(page, teacher_id)),
+            ("Exit", ft.icons.EXIT_TO_APP, lambda e: page.window_close()),
         ]
 
         buttons = []
@@ -227,6 +232,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=15,
+                expand=True,  # Ensure the column takes up all available space
             ),
             padding=40,
             width=800,
@@ -247,7 +253,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
         background = ft.Container(
             content=card,
             alignment=ft.alignment.center,
-            expand=True,
+            expand=True,  # Ensure the container takes up the full page
             gradient=ft.RadialGradient(
                 center=ft.Alignment(0, 0),
                 radius=2.0,

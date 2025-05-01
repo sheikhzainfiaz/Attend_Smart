@@ -3,7 +3,6 @@ import os
 import traceback
 import logging
 
-
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -13,21 +12,6 @@ def open_student_details(page: ft.Page):
     import Student  # This imports the student.py script
     Student.main(page)
 
-def open_course_details(page: ft.Page):
-    page.controls.clear()
-    import Course
-    Course.main(page)
-    
-def open_section_details(page: ft.Page):
-    page.controls.clear()
-    import Section
-    Section.main(page)
-
-def open_enrollment_details(page: ft.Page):
-    page.controls.clear()
-    import Enrollment
-    Enrollment.main(page)
-    
 def open_teacher_details(page: ft.Page):
     page.controls.clear()
     import teacher
@@ -37,10 +21,10 @@ def show_main(page: ft.Page):
     logging.debug("Starting main function")
     page.title = "Face Recognition System"
     page.bgcolor = ft.colors.BLACK
-    page.padding = 20
+    page.padding = 0  # Remove padding to eliminate extra space
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.scroll = ft.ScrollMode.AUTO
+    page.scroll = None  # Disable scroll to prevent extra space
 
     # Dark Theme Colors
     primary_color = ft.colors.BLUE_600
@@ -60,7 +44,10 @@ def show_main(page: ft.Page):
 
     def show_sub_page(title_text):
         try:
+            # Clear all existing controls to ensure the new page replaces the dashboard
             page.controls.clear()
+            page.update()
+
             content = ft.Column(
                 [
                     ft.Text(
@@ -90,12 +77,13 @@ def show_main(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=20,
+                expand=True,  # Ensure the column takes up all available space
             )
 
             page.add(
                 ft.Container(
                     content=content,
-                    expand=True,
+                    expand=True,  # Ensure the container takes up the full page
                     alignment=ft.alignment.center,
                     gradient=ft.RadialGradient(
                         center=ft.Alignment(0, -0.8),
@@ -120,7 +108,9 @@ def show_main(page: ft.Page):
 
     def show_home_page():
         try:
+            # Clear all existing controls to ensure a clean slate
             page.controls.clear()
+            page.update()
 
             title = ft.Text(
                 "Face Recognition Attendance System",
@@ -137,19 +127,15 @@ def show_main(page: ft.Page):
             )
 
             button_data_row1 = [
-                ("Train Data", ft.Icons.TRAIN, lambda e: show_sub_page("Train Data")),
-                ("Face Detection", ft.Icons.CAMERA, lambda e: show_sub_page("Face Detection")),
                 ("Student Details", ft.icons.PERSON, lambda e: open_student_details(page)),
+                ("Face Detection", ft.icons.CAMERA, lambda e: show_sub_page("Face Detection")),
+                ("Attendance", ft.icons.EVENT, lambda e: show_sub_page("Attendance")),
                 ("Teacher Details", ft.icons.PEOPLE, lambda e: open_teacher_details(page)),
-                ("Course Details", ft.icons.GOLF_COURSE, lambda e: open_course_details(page)),
-                
-                
             ]
 
             button_data_row2 = [
-                ("Section Details", ft.icons.EVENT, lambda e: open_section_details(page)),
-                ("Enrollemnt Details", ft.icons.FLASH_ON, lambda e: open_enrollment_details(page)),
-                ("Photos", ft.Icons.PHOTO_LIBRARY, lambda e: open_images()),
+                ("Train Data", ft.icons.FLASH_ON, lambda e: show_sub_page("Train Data")),
+                ("Photos", ft.icons.PHOTO_LIBRARY, lambda e: open_images()),
                 ("Developer", ft.icons.CODE, lambda e: show_sub_page("Developer")),
                 ("Exit", ft.icons.EXIT_TO_APP, lambda e: page.window_close()),
             ]
@@ -215,8 +201,9 @@ def show_main(page: ft.Page):
                         alignment=ft.MainAxisAlignment.CENTER,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         spacing=30,
+                        expand=True,  # Ensure the column takes up all available space
                     ),
-                    expand=True,
+                    expand=True,  # Ensure the container takes up the full page
                     gradient=ft.RadialGradient(
                         center=ft.Alignment(0, -0.8),
                         radius=1.5,
@@ -241,7 +228,6 @@ def show_main(page: ft.Page):
         show_error(f"Initial render failed: {str(e)}\n{traceback.format_exc()}")
         page.add(ft.Text(f"Initial render failed: {str(e)}", color=ft.colors.RED_400))
         page.update()
-
 
 if __name__ == "__main__":
     logging.debug("Running Flet app")
