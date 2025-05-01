@@ -20,109 +20,77 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_alert_dialog(title, message, is_error=False):
-        logging.debug(f"Attempting to show AlertDialog: Title='{title}', Message='{message}', IsError={is_error}")
-        try:
-            dialog = ft.AlertDialog(
-                modal=True,
-                title=ft.Text(title),
-                content=ft.Text(message),
-                actions=[
-                    ft.TextButton("OK", on_click=lambda e: close_dialog())
-                ],
-                actions_alignment=ft.MainAxisAlignment.END
-            )
+    def show_alert_dialog(title, message):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
+            actions_alignment=ft.MainAxisAlignment.END
+        )
 
-            def close_dialog():
-                logging.debug("Closing AlertDialog")
-                dialog.open = False
-                page.update()
-
-            page.overlay.append(dialog)
-            dialog.open = True
-            logging.debug("Dialog added to overlay, calling page.update()")
-            page.update()
-            logging.debug("AlertDialog should now be visible")
-        except Exception as ex:
-            logging.error(f"Error displaying dialog: {ex}")
-            page.add(ft.Text(f"Error: {ex}"))
+        def close_dialog():
+            dialog.open = False
             page.update()
 
-    full_name = ft.TextField(
-        label="Full Name",
-        hint_text="Enter teacher’s full name",
-        prefix_icon=ft.icons.PERSON,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720
-    )
-    email = ft.TextField(
-        label="Email",
-        hint_text="Enter email address",
-        prefix_icon=ft.icons.EMAIL,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720
-    )
-    phone = ft.TextField(
-        label="Phone",
-        hint_text="Enter phone number",
-        prefix_icon=ft.icons.PHONE,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720
-    )
-    username = ft.TextField(
-        label="Username",
-        hint_text="Enter username",
-        prefix_icon=ft.icons.ACCOUNT_CIRCLE,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720
-    )
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
+
+    def show_confirm_dialog(title, message, on_confirm):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
+                ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
+            ],
+            actions_alignment=ft.MainAxisAlignment.END
+        )
+
+        def close_dialog():
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
+
+    show_password = ft.Ref[bool]()
+    show_password.current = False
+
+    def toggle_password_visibility(e):
+        show_password.current = not show_password.current
+        password.password = not show_password.current
+        password.suffix = ft.IconButton(
+            icon=ft.icons.VISIBILITY_OFF if show_password.current else ft.icons.VISIBILITY,
+            on_click=toggle_password_visibility,
+            icon_color=ft.colors.BLUE_200,
+            style=ft.ButtonStyle(padding=0)
+        )
+        page.update()
+
+    full_name = ft.TextField(label="Full Name", prefix_icon=ft.icons.PERSON, text_style=ft.TextStyle(color=ft.colors.WHITE))
+    email = ft.TextField(label="Email", prefix_icon=ft.icons.EMAIL, text_style=ft.TextStyle(color=ft.colors.WHITE))
+    phone = ft.TextField(label="Phone", prefix_icon=ft.icons.PHONE, text_style=ft.TextStyle(color=ft.colors.WHITE))
+    username = ft.TextField(label="Username", prefix_icon=ft.icons.ACCOUNT_CIRCLE, text_style=ft.TextStyle(color=ft.colors.WHITE))
     password = ft.TextField(
         label="Password",
-        hint_text="Enter password",
         prefix_icon=ft.icons.LOCK,
         password=True,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720
+        suffix=ft.IconButton(
+            icon=ft.icons.VISIBILITY,
+            on_click=toggle_password_visibility,
+            icon_color=ft.colors.BLUE_200,
+            style=ft.ButtonStyle(padding=0)
+        )
     )
 
     search_field = ft.TextField(
-        label="Search by Full Name",
-        hint_text="Enter name",
+        label="Search Teachers",
+        hint_text="Enter name or username",
         prefix_icon=ft.icons.SEARCH,
         border_color=accent_color,
         focused_border_color=primary_color,
@@ -132,18 +100,22 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        on_change=lambda e: update_table(e.control.value.strip()),
-        width=600
+        on_change=lambda e: update_table(e.control.value.strip())
     )
+
+    for field in [full_name, email, phone, username, password]:
+        field.border_color = accent_color
+        field.focused_border_color = primary_color
+        field.filled = True
+        field.bgcolor = ft.colors.with_opacity(0.05, ft.colors.WHITE)
+        field.border_radius = 10
+        field.label_style = ft.TextStyle(color=ft.colors.BLUE_200)
+        field.hint_style = ft.TextStyle(color=ft.colors.BLUE_200)
 
     selected_id = ft.Ref[str]()
 
     def clear_form():
-        full_name.value = ""
-        email.value = ""
-        phone.value = ""
-        username.value = ""
-        password.value = ""
+        full_name.value = email.value = phone.value = username.value = password.value = ""
         search_field.value = ""
         selected_id.current = None
         update_table()
@@ -154,16 +126,14 @@ def main(page: ft.Page):
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             if search_term:
-                cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers WHERE Full_Name LIKE %s", (f"%{search_term}%",))
+                cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers WHERE Full_Name LIKE %s OR Username LIKE %s", (f"%{search_term}%", f"%{search_term}%"))
             else:
                 cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers")
             data = cursor.fetchall()
             conn.close()
-            logging.debug(f"Fetched {len(data)} teachers")
             return data
-        except mysql.connector.Error as e:
-            logging.error(f"Database error: {e}")
-            show_alert_dialog("Database Error", f"Error fetching teachers: {e}", is_error=True)
+        except Exception as e:
+            show_alert_dialog("Error", f"Error fetching data: {e}")
             return []
 
     data_table = ft.DataTable(
@@ -199,7 +169,6 @@ def main(page: ft.Page):
                     on_select_changed=lambda e, tid=teacher_id: select_teacher(tid)
                 )
             )
-        logging.debug(f"Table updated with {len(data_table.rows)} rows")
         page.update()
 
     def select_teacher(teacher_id):
@@ -212,248 +181,96 @@ def main(page: ft.Page):
             conn.close()
             if t:
                 full_name.value, email.value, phone.value, username.value, password.value = t
-                logging.debug("Form populated with selected teacher data")
             page.update()
-        except mysql.connector.Error as e:
-            logging.error(f"Database error: {e}")
-            show_alert_dialog("Database Error", f"Error selecting teacher: {e}", is_error=True)
-            page.update()
+        except Exception as e:
+            show_alert_dialog("Error", f"Select error: {e}")
 
     def add_teacher(e):
-        logging.debug("Add button clicked")
-        name = full_name.value.strip() if full_name.value else ""
-        mail = email.value.strip() if email.value else ""
-        phone_val = phone.value.strip() if phone.value else ""
-        user = username.value.strip() if username.value else ""
-        pwd = password.value.strip() if password.value else ""
-
-        # Validate fields
-        missing_fields = []
-        if not name:
-            missing_fields.append("Full Name")
-        if not mail:
-            missing_fields.append("Email")
-        if not phone_val:
-            missing_fields.append("Phone")
-        if not user:
-            missing_fields.append("Username")
-        if not pwd:
-            missing_fields.append("Password")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
-            logging.warning(f"Add failed: {error_message}")
-            show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
+        if not all([full_name.value.strip(), email.value.strip(), phone.value.strip(), username.value.strip(), password.value.strip()]):
+            show_alert_dialog("Validation Error", "All fields are required!")
             return
-
         try:
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO teachers (Full_Name, Email, Phone, Username, Password) VALUES (%s, %s, %s, %s, %s)",
-                           (name, mail, phone_val, user, pwd))
+                           (full_name.value, email.value, phone.value, username.value, password.value))
             conn.commit()
             conn.close()
-            show_alert_dialog("Success", "Teacher added successfully")
-            logging.info(f"Added teacher: {name}")
+            show_alert_dialog("Success", "Teacher added successfully!")
             clear_form()
             update_table()
-        except mysql.connector.Error as e:
-            logging.error(f"Database error: {e}")
-            show_alert_dialog("Database Error", f"Error adding teacher: {e}", is_error=True)
-            page.update()
+        except Exception as e:
+            show_alert_dialog("Error", f"Add error: {e}")
 
     def update_teacher(e):
-        logging.debug("Update button clicked")
         if not selected_id.current:
-            show_alert_dialog("Validation Error", "Please select a teacher to update!", is_error=True)
-            logging.warning("Update failed: No teacher selected")
-            page.update()
+            show_alert_dialog("Validation Error", "Select a teacher to update")
             return
 
-        name = full_name.value.strip() if full_name.value else ""
-        mail = email.value.strip() if email.value else ""
-        phone_val = phone.value.strip() if phone.value else ""
-        user = username.value.strip() if username.value else ""
-        pwd = password.value.strip() if password.value else ""
+        def confirm_update():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE teachers SET Full_Name=%s, Email=%s, Phone=%s, Username=%s, Password=%s WHERE Teacher_ID=%s",
+                               (full_name.value, email.value, phone.value, username.value, password.value, selected_id.current))
+                conn.commit()
+                conn.close()
+                show_alert_dialog("Success", "Teacher updated successfully!")
+                clear_form()
+                update_table()
+            except Exception as e:
+                show_alert_dialog("Error", f"Update error: {e}")
 
-        # Validate fields
-        missing_fields = []
-        if not name:
-            missing_fields.append("Full Name")
-        if not mail:
-            missing_fields.append("Email")
-        if not phone_val:
-            missing_fields.append("Phone")
-        if not user:
-            missing_fields.append("Username")
-        if not pwd:
-            missing_fields.append("Password")
-
-        if missing_fields:
-            error_message = f"Missing: {', '.join(missing_fields)}"
-            logging.warning(f"Update failed: {error_message}")
-            show_alert_dialog("Validation Error", error_message, is_error=True)
-            page.update()
-            return
-
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("UPDATE teachers SET Full_Name=%s, Email=%s, Phone=%s, Username=%s, Password=%s WHERE Teacher_ID=%s",
-                           (name, mail, phone_val, user, pwd, selected_id.current))
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Teacher updated successfully")
-            logging.info(f"Updated teacher: {name}")
-            clear_form()
-            update_table()
-        except mysql.connector.Error as e:
-            logging.error(f"Database error: {e}")
-            show_alert_dialog("Database Error", f"Error updating teacher: {e}", is_error=True)
-            page.update()
+        show_confirm_dialog("Confirm Update", "Are you sure you want to update this teacher?", confirm_update)
 
     def delete_teacher(e):
-        logging.debug("Delete button clicked")
         if not selected_id.current:
-            show_alert_dialog("Validation Error", "Please select a teacher to delete!", is_error=True)
-            logging.warning("Delete failed: No teacher selected")
-            page.update()
+            show_alert_dialog("Validation Error", "Select a teacher to delete")
             return
 
-        try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM teachers WHERE Teacher_ID=%s", (selected_id.current,))
-            conn.commit()
-            conn.close()
-            show_alert_dialog("Success", "Teacher deleted successfully")
-            logging.info(f"Deleted teacher: {selected_id.current}")
-            clear_form()
-            update_table()
-        except mysql.connector.Error as e:
-            logging.error(f"Database error: {e}")
-            show_alert_dialog("Database Error", f"Error deleting teacher: {e}", is_error=True)
-            page.update()
+        def confirm_delete():
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM teachers WHERE Teacher_ID=%s", (selected_id.current,))
+                conn.commit()
+                conn.close()
+                show_alert_dialog("Success", "Teacher deleted successfully!")
+                clear_form()
+                update_table()
+            except Exception as e:
+                show_alert_dialog("Error", f"Delete error: {e}")
 
-    def search_click(e):
-        logging.debug("Search button clicked")
-        update_table(search_field.value.strip())
+        show_confirm_dialog("Confirm Delete", "Are you sure you want to delete this teacher?", confirm_delete)
 
     btns = ft.Row([
-        ft.ElevatedButton(
-            text="Add",
-            on_click=add_teacher,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                bgcolor=ft.colors.BLUE_600,
-                color=ft.colors.WHITE,
-                elevation={"default": 5, "hovered": 8},
-                animation_duration=300,
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-            )
-        ),
-        ft.ElevatedButton(
-            text="Update",
-            on_click=update_teacher,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                bgcolor=ft.colors.AMBER_600,
-                color=ft.colors.WHITE,
-                elevation={"default": 5, "hovered": 8},
-                animation_duration=300,
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-            )
-        ),
-        ft.ElevatedButton(
-            text="Delete",
-            on_click=delete_teacher,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                bgcolor=ft.colors.RED_600,
-                color=ft.colors.WHITE,
-                elevation={"default": 5, "hovered": 8},
-                animation_duration=300,
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-            )
-        ),
-        ft.ElevatedButton(
-            text="Clear",
-            on_click=lambda e: clear_form(),
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                bgcolor=ft.colors.GREY_600,
-                color=ft.colors.WHITE,
-                elevation={"default": 5, "hovered": 8},
-                animation_duration=300,
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-            )
-        ),
-    ], alignment=ft.MainAxisAlignment.CENTER, spacing=10)
-
-    search_row = ft.Row([
-        search_field,
-        ft.ElevatedButton(
-            text="Search",
-            on_click=search_click,
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                bgcolor=ft.colors.BLUE_600,
-                color=ft.colors.WHITE,
-                elevation={"default": 5, "hovered": 8},
-                animation_duration=300,
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-            )
-        )
-    ], alignment=ft.MainAxisAlignment.CENTER, spacing=10)
-
-    data_table_container = ft.Container(
-        content=ft.Column(
-            [data_table],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-        ),
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        padding=10,
-        expand=True,
-        height=300
-    )
+        ft.ElevatedButton("Add Teacher", on_click=add_teacher, bgcolor=primary_color, color=ft.colors.WHITE,
+                          style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=20, vertical=15), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
+        ft.ElevatedButton("Update", on_click=update_teacher, bgcolor=ft.colors.AMBER_600, color=ft.colors.WHITE,
+                          style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=20, vertical=15), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
+        ft.ElevatedButton("Delete", on_click=delete_teacher, bgcolor=ft.colors.RED_600, color=ft.colors.WHITE,
+                          style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=20, vertical=15), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
+        ft.ElevatedButton("Clear", on_click=lambda e: clear_form(), bgcolor=ft.colors.GREY_600, color=ft.colors.WHITE,
+                          style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=20, vertical=15), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
+    ], alignment=ft.MainAxisAlignment.CENTER)
 
     card = ft.Container(
         content=ft.Column([
-            ft.Text(
-                "Teacher Management",
-                size=28,
-                weight=ft.FontWeight.BOLD,
-                color=ft.colors.WHITE,
-                text_align=ft.TextAlign.CENTER
-            ),
-            ft.Text(
-                "Add, update, or delete teacher records",
-                size=16,
-                color=ft.colors.BLUE_200,
-                text_align=ft.TextAlign.CENTER
-            ),
-            ft.Divider(height=20, color=ft.colors.TRANSPARENT),
-            full_name,
-            email,
-            phone,
-            username,
-            password,
+            ft.Text("Teacher Management", size=28, weight=ft.FontWeight.BOLD, color=ft.colors.WHITE),
+            full_name, email, phone, username, password,
             btns,
-            search_row,
-            data_table_container
+            search_field,
+            ft.Container(
+                content=ft.Column([
+                    data_table
+                ], scroll=ft.ScrollMode.AUTO),
+                padding=10,
+                bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+                border_radius=10,
+                height=250,
+                alignment=ft.alignment.center,
+                width=750
+            )
         ], spacing=15, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         padding=40,
         width=800,
@@ -476,6 +293,7 @@ def main(page: ft.Page):
             ],
         )
     )
+
     page.add(background)
     update_table()
 

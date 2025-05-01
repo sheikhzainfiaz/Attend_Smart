@@ -5,9 +5,8 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def show_manage_attendance_page(page: ft.Page, teacher_id: int, on_back):
-    page.controls.clear()
-    page.title = "Manage Attendance - Face Recognition System"
+def main_manage(page: ft.Page,teacher_id=1):
+    page.title = "Attendance Management - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
@@ -22,60 +21,91 @@ def show_manage_attendance_page(page: ft.Page, teacher_id: int, on_back):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_message(message, is_error=False):
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text(
-                message,
-                color=ft.colors.WHITE,
-                weight=ft.FontWeight.W_500,
-                size=14,
-            ),
-            bgcolor=ft.colors.RED_600 if is_error else ft.colors.GREEN_600,
-            duration=3000,
-            padding=10,
+    def show_alert_dialog(title, message):
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
+            actions_alignment=ft.MainAxisAlignment.END
         )
-        page.snack_bar.open = True
+
+        def close_dialog():
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
         page.update()
 
-    # Date Picker
-    date_picker = ft.DatePicker(
-        on_change=lambda e: update_attendance_table(),
-        first_date=datetime(2020, 1, 1),
-        last_date=datetime.now(),
-        field_label_text="Select Date",
-    )
-    page.overlay.append(date_picker)
+    # Dummy Teacher_ID for testing
+    DUMMY_TEACHER_ID = teacher_id  # Kasloom from your sample data
 
-    date_button = ft.ElevatedButton(
-        "Pick Date",
-        icon=ft.icons.CALENDAR_TODAY,
-        on_click=lambda e: date_picker.pick_date(),
-        style=ft.ButtonStyle(
-            bgcolor=primary_color,
-            color=ft.colors.WHITE,
-            shape=ft.RoundedRectangleBorder(radius=8),
-            padding=15,
-        ),
-    )
-
-    # Dropdown for selecting a course the teacher teaches
+    # Dropdowns
     course_dropdown = ft.Dropdown(
-        label="Course",
-        hint_text="Select a course",
+        label="Select Course",
+        options=[],
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
         bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
-        prefix_icon=ft.icons.BOOK,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        width=720,
-        on_change=lambda e: update_attendance_table(),
+        on_change=lambda e: update_section_dropdown()
     )
 
-    # Data table to display attendance records
+    section_dropdown = ft.Dropdown(
+        label="Select Section",
+        options=[],
+        border_color=accent_color,
+        focused_border_color=primary_color,
+        filled=True,
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        border_radius=10,
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        on_change=lambda e: update_table()
+    )
+
+    # Date picker
+    selected_date = ft.Ref[str]()
+    selected_date.current = datetime.now().strftime("%Y-%m-%d")
+    
+    date_picker = ft.DatePicker(
+        on_change=lambda e: update_selected_date(e.control.value),
+        first_date=datetime(2023, 1, 1),
+        last_date=datetime(2025, 12, 31),
+        value=datetime.now()
+    )
+    page.overlay.append(date_picker)
+
+    date_button = ft.ElevatedButton(
+        "Select Date",
+        icon=ft.icons.CALENDAR_TODAY,
+        on_click=lambda e: date_picker.open(),
+        bgcolor=ft.colors.BLUE_800,
+        color=ft.colors.WHITE,
+        style=ft.ButtonStyle(
+            padding=ft.padding.symmetric(horizontal=15, vertical=10),
+            text_style=ft.TextStyle(size=14)
+        )
+    )
+
+    date_display = ft.Text(
+        value=selected_date.current,
+        color=ft.colors.WHITE,
+        size=14
+    )
+
+    def update_selected_date(date_value):
+        if date_value:
+            selected_date.current = date_value.strftime("%Y-%m-%d")
+            date_display.value = selected_date.current
+            update_table()
+            page.update()
+
+    # Data table for students and attendance
     data_table = ft.DataTable(
         border=ft.Border(
             top=ft.BorderSide(1, ft.colors.BLUE_200),
@@ -86,222 +116,190 @@ def show_manage_attendance_page(page: ft.Page, teacher_id: int, on_back):
         heading_row_color=ft.colors.with_opacity(0.1, ft.colors.BLUE_600),
         heading_text_style=ft.TextStyle(color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
         columns=[
-            ft.DataColumn(ft.Text("Attendance ID", color=ft.colors.WHITE)),
             ft.DataColumn(ft.Text("Roll No", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Full Name", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Course Name", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Section Name", color=ft.colors.WHITE)),
+            ft.DataColumn(ft.Text("Name", color=ft.colors.WHITE)),
             ft.DataColumn(ft.Text("Status", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Timestamp", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Action", color=ft.colors.WHITE)),
         ],
-        rows=[],
+        rows=[]
     )
 
-    def fetch_teacher_courses():
+    def update_course_dropdown():
+        course_dropdown.options = []
+        section_dropdown.options = []
+        data_table.rows = []
         try:
-            conn = mysql.connector.connect(
-                host="localhost", user="root", password="root", database="face_db", port=3306
-            )
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
-            query = """
-                SELECT e.CourseID, e.SectionID, c.CourseCode, c.CourseName, s.Name
-                FROM enrollment e
-                JOIN course c ON e.CourseID = c.CourseID
-                JOIN section s ON e.SectionID = s.SectionID
+            cursor.execute("""
+                SELECT DISTINCT c.CourseID, c.CourseName
+                FROM course c
+                JOIN enrollment e ON c.CourseID = e.CourseID
                 WHERE e.Teacher_ID = %s
-            """
-            cursor.execute(query, (teacher_id,))
+            """, (DUMMY_TEACHER_ID,))
             courses = cursor.fetchall()
             conn.close()
             course_dropdown.options = [
-                ft.dropdown.Option(
-                    key=f"{course[0]}:{course[1]}",  # CourseID:SectionID
-                    text=f"{course[2]} - {course[3]} (Section: {course[4]})"
-                ) for course in courses
+                ft.dropdown.Option(key=str(course_id), text=course_name)
+                for course_id, course_name in courses
             ]
             page.update()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
+            update_section_dropdown()
+        except Exception as e:
+            show_alert_dialog("Error", f"Error fetching courses: {e}")
 
-    def fetch_attendance_records(course_id=None, section_id=None, selected_date=None):
-        try:
-            conn = mysql.connector.connect(
-                host="localhost", user="root", password="root", database="face_db", port=3306
-            )
-            cursor = conn.cursor()
-            if course_id and section_id and selected_date:
-                query = """
-                    SELECT a.AttendanceID, a.Roll_no, s.Full_Name, c.CourseName, sec.Name, a.Status, a.Attendance_Timestamp
-                    FROM attendance a
-                    JOIN student s ON a.Roll_no = s.Roll_no
-                    JOIN course_help c ON a.CourseID = c.CourseID
-                    JOIN section sec ON a.SectionID = sec.SectionID
-                    WHERE a.Teacher_ID = %s AND a.CourseID = %s AND a.SectionID = %s
-                    AND DATE(a.Attendance_Timestamp) = %s
-                """
-                cursor.execute(query, (teacher_id, course_id, section_id, selected_date))
-            elif course_id and section_id:
-                query = """
-                    SELECT a.AttendanceID, a.Roll_no, s.Full_Name, c.CourseName, sec.Name, a.Status, a.Attendance_Timestamp
-                    FROM attendance a
-                    JOIN student s ON a.Roll_no = s.Roll_no
-                    JOIN course c ON a.CourseID = c.CourseID
-                    JOIN section sec ON a.SectionID = sec.SectionID
-                    WHERE a.Teacher_ID = %s AND a.CourseID = %s AND a.SectionID = %s
-                """
-                cursor.execute(query, (teacher_id, course_id, section_id))
-            else:
-                query = """
-                    SELECT a.AttendanceID, a.Roll_no, s.Full_Name, c.CourseName, sec.Name, a.Status, a.Attendance_Timestamp
-                    FROM attendance a
-                    JOIN student s ON a.Roll_no = s.Roll_no
-                    JOIN course c ON a.CourseID = c.CourseID
-                    JOIN section sec ON a.SectionID = sec.SectionID
-                    WHERE a.Teacher_ID = %s
-                """
-                cursor.execute(query, (teacher_id,))
-            records = cursor.fetchall()
-            conn.close()
-            logging.debug(f"Fetched {len(records)} attendance records")
-            return records
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
-            return []
-
-    def update_attendance_table():
-        data_table.rows.clear()
-        selected_date = date_picker.value.strftime("%Y-%m-%d") if date_picker.value else None
+    def update_section_dropdown():
+        section_dropdown.options = []
+        data_table.rows = []
         if not course_dropdown.value:
-            records = fetch_attendance_records(selected_date=selected_date)
-        else:
-            course_id, section_id = map(int, course_dropdown.value.split(":"))
-            records = fetch_attendance_records(course_id, section_id, selected_date)
-        for record in records:
-            attendance_id, roll_no, full_name, course_name, section_name, status, timestamp = record
-            delete_btn = ft.IconButton(
-                icon=ft.icons.DELETE,
-                icon_color=ft.colors.RED_600,
-                on_click=lambda e, aid=attendance_id: delete_attendance(aid),
-            )
-            data_table.rows.append(
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text(str(attendance_id), color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(roll_no, color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(full_name, color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(course_name, color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(section_name, color=ft.colors.WHITE)),
-                        ft.DataCell(
-                            ft.Text(
-                                status,
-                                color=ft.colors.GREEN_400 if status == "Present" else ft.colors.RED_400,
-                            )
-                        ),
-                        ft.DataCell(ft.Text(str(timestamp), color=ft.colors.WHITE)),
-                        ft.DataCell(delete_btn),
-                    ]
-                )
-            )
-        page.update()
-
-    def delete_attendance(attendance_id):
+            page.update()
+            return
         try:
-            conn = mysql.connector.connect(
-                host="localhost", user="root", password="root", database="face_db", port=3306
-            )
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM attendance WHERE AttendanceID = %s", (attendance_id,))
+            cursor.execute("""
+                SELECT DISTINCT s.SectionID, s.Name
+                FROM section s
+                JOIN enrollment e ON s.SectionID = e.SectionID
+                WHERE e.Teacher_ID = %s AND e.CourseID = %s
+            """, (DUMMY_TEACHER_ID, course_dropdown.value))
+            sections = cursor.fetchall()
+            conn.close()
+            section_dropdown.options = [
+                ft.dropdown.Option(key=str(section_id), text=section_name)
+                for section_id, section_name in sections
+            ]
+            page.update()
+            update_table()
+        except Exception as e:
+            show_alert_dialog("Error", f"Error fetching sections: {e}")
+
+    def update_table():
+        data_table.rows = []
+        if not all([course_dropdown.value, section_dropdown.value, selected_date.current]):
+            page.update()
+            return
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT s.Roll_no, s.Full_Name, a.Status
+                FROM student s
+                LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                    AND a.Teacher_ID = %s
+                    AND a.CourseID = %s
+                    AND a.SectionID = %s
+                    AND a.Attendance_Date = %s
+                WHERE s.SectionID = %s
+            """, (DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, selected_date.current, section_dropdown.value))
+            students = cursor.fetchall()
+            conn.close()
+            
+            for roll_no, full_name, status in students:
+                status_text = status if status else "Absent"
+                data_table.rows.append(
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(roll_no, color=ft.colors.WHITE)),
+                            ft.DataCell(ft.Text(full_name, color=ft.colors.WHITE)),
+                            ft.DataCell(
+                                ft.Dropdown(
+                                    value=status_text,
+                                    options=[
+                                        ft.dropdown.Option("Present"),
+                                        ft.dropdown.Option("Absent")
+                                    ],
+                                    border_color=accent_color,
+                                    focused_border_color=primary_color,
+                                    filled=True,
+                                    bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+                                    text_style=ft.TextStyle(color=ft.colors.WHITE),
+                                    on_change=lambda e, rn=roll_no: update_attendance(rn, e.control.value)
+                                )
+                            ),
+                        ]
+                    )
+                )
+            page.update()
+        except Exception as e:
+            show_alert_dialog("Error", f"Error fetching students: {e}")
+
+    def update_attendance(roll_no, status):
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            # Check if attendance record exists for the selected date
+            cursor.execute("""
+                SELECT AttendanceID FROM attendance
+                WHERE Roll_no = %s
+                AND Teacher_ID = %s
+                AND CourseID = %s
+                AND SectionID = %s
+                AND Attendance_Date = %s
+            """, (roll_no, DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, selected_date.current))
+            existing = cursor.fetchone()
+            
+            current_time = datetime.now().strftime("%H:%M:%S")
+            
+            if existing:
+                # Update existing record
+                cursor.execute("""
+                    UPDATE attendance
+                    SET Status = %s, Attendance_Time = %s
+                    WHERE AttendanceID = %s
+                """, (status, current_time, existing[0]))
+            else:
+                # Insert new record
+                cursor.execute("""
+                    INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (DUMMY_TEACHER_ID, course_dropdown.value, section_dropdown.value, roll_no, selected_date.current, current_time, status))
+            
             conn.commit()
             conn.close()
-            show_message("Attendance record deleted successfully!")
-            logging.info(f"Deleted attendance record: {attendance_id}")
-            update_attendance_table()
-        except mysql.connector.Error as err:
-            logging.error(f"Database error: {err}")
-            show_message(f"Database Error: {err}", is_error=True)
-            page.update()
+            show_alert_dialog("Success", f"Attendance updated for {roll_no}")
+            update_table()
+        except Exception as e:
+            show_alert_dialog("Error", f"Error updating attendance: {e}")
 
-    data_table_container = ft.Container(
-        content=ft.Column(
-            [data_table],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-            alignment=ft.MainAxisAlignment.CENTER,
+    # Buttons
+    btns = ft.Row([
+        date_button,
+        date_display,
+        ft.ElevatedButton(
+            "Refresh",
+            on_click=lambda e: update_table(),
+            bgcolor=primary_color,
+            color=ft.colors.WHITE,
+            style=ft.ButtonStyle(
+                padding=ft.padding.symmetric(horizontal=20, vertical=15),
+                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+            )
         ),
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
-        border_radius=10,
-        padding=10,
-        expand=True,
-        alignment=ft.alignment.center,
-        height=300,
-    )
+    ], alignment=ft.MainAxisAlignment.CENTER, spacing=20)
 
     card = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Manage Attendance",
-                    size=28,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.colors.WHITE,
-                    text_align=ft.TextAlign.CENTER,
-                ),
-                ft.Text(
-                    "View and manage attendance records",
-                    size=16,
-                    color=ft.colors.BLUE_200,
-                    text_align=ft.TextAlign.CENTER,
-                ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
-                ft.Row(
-                    [date_button, course_dropdown],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=20,
-                ),
-                ft.Row(
-                    [
-                        ft.ElevatedButton(
-                            "Back to Dashboard",
-                            on_click=on_back,
-                            style=ft.ButtonStyle(
-                                shape=ft.RoundedRectangleBorder(radius=12),
-                                padding=ft.padding.symmetric(horizontal=20, vertical=15),
-                                bgcolor=primary_color,
-                                color=ft.colors.WHITE,
-                                elevation={"default": 5, "hovered": 8},
-                                animation_duration=300,
-                                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                                overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
-                            ),
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=10,
-                ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
-                data_table_container,
-            ],
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=15,
-        ),
+        content=ft.Column([
+            ft.Text("Attendance Management", size=28, weight=ft.FontWeight.BOLD, color=ft.colors.WHITE),
+            course_dropdown,
+            section_dropdown,
+            btns,
+            ft.Container(
+                content=ft.Column([
+                    data_table
+                ], scroll=ft.ScrollMode.AUTO),
+                padding=10,
+                bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+                border_radius=10,
+                height=350,
+                alignment=ft.alignment.center,
+                width=750
+            )
+        ], spacing=15, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         padding=40,
         width=800,
         bgcolor=card_bg,
         border_radius=20,
-        shadow=ft.BoxShadow(
-            blur_radius=30,
-            spread_radius=5,
-            color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
-        ),
-        animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-        scale=ft.transform.Scale(scale=1.0),
-        on_hover=lambda e: e.control.update(
-            scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
-        ),
+        shadow=ft.BoxShadow(blur_radius=30, spread_radius=5, color=ft.colors.with_opacity(0.3, ft.colors.BLACK))
     )
 
     background = ft.Container(
@@ -309,17 +307,15 @@ def show_manage_attendance_page(page: ft.Page, teacher_id: int, on_back):
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
-            center=ft.Alignment(0, 0),
-            radius=2.0,
+            center=ft.Alignment(0, -0.8),
+            radius=1.5,
             colors=[
-                ft.colors.with_opacity(0.4, primary_color),
-                ft.colors.with_opacity(0.2, accent_color),
+                ft.colors.with_opacity(0.2, primary_color),
+                ft.colors.with_opacity(0.1, accent_color),
                 ft.colors.BLACK,
             ],
-        ),
+        )
     )
 
     page.add(background)
-    fetch_teacher_courses()
-    update_attendance_table()
-    page.update()
+    update_course_dropdown()

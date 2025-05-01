@@ -1,7 +1,8 @@
 import flet as ft
 import mysql.connector
 import logging
-from manage_attendance import show_manage_attendance_page
+from manage_attendance import main_manage
+from mark_attendance import main
 
 def configure_logging():
     """Configure logging after all imports are resolved to avoid circular imports."""
@@ -158,8 +159,8 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
     def show_home_page():
         page.controls.clear()
         button_data = [
-            ("Mark Attendance", ft.Icons.EVENT, lambda e: show_dummy_page("Mark Attendance")),
-            ("Manage Attendance", ft.Icons.LIST, lambda e: show_manage_attendance_page(page, teacher_id, on_back=lambda e: show_home_page())),
+            ("Mark Attendance", ft.Icons.EVENT, lambda e: main(page,teacher_id)),
+            ("Manage Attendance", ft.Icons.LIST, lambda e: main_manage(page, teacher_id)),
             ("Exit", ft.Icons.EXIT_TO_APP, lambda e: page.window_close()),
         ]
 

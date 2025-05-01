@@ -1,1 +1,0 @@
-ft.colors.BLUE_700
