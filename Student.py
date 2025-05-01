@@ -7,6 +7,7 @@ import os
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
+
 # Function to fetch sections from the MySQL database
 def get_sections_from_db():
     try:
@@ -43,7 +44,9 @@ def main(page: ft.Page):
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
+    
     )
+    
 
     # AlertDialog function
     def show_alert_dialog(title, message, is_success=False, is_error=False):
@@ -666,6 +669,9 @@ def main(page: ft.Page):
     )
 
     page.add(background)
+
+
+
 
 if __name__ == "__main__":
     logging.debug("Running Flet app")
