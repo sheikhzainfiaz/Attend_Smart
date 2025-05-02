@@ -1,6 +1,8 @@
 import flet as ft
 import mysql.connector
 import logging
+from back_button import create_back_button
+from Dash import show_main
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -328,19 +330,35 @@ def main(page: ft.Page):
         shadow=ft.BoxShadow(blur_radius=30, spread_radius=5, color=ft.colors.with_opacity(0.3, ft.colors.BLACK))
     )
 
+    back_btn = create_back_button(
+        page,
+        show_main,
+        primary_color=primary_color,
+        teacher_id=None,
+        on_click=lambda e: [page.controls.clear(), show_main(page)]
+    )
+
+    # Background with radial gradient
     background = ft.Container(
-        content=card,
+        content=ft.Stack([
+            card,
+            ft.Container(
+                content=back_btn,
+                top=10,
+                left=10,
+            ),
+        ]),
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
-            center=ft.Alignment(0, -0.8),
-            radius=1.5,
+            center=ft.Alignment(0, 0),
+            radius=2.0,
             colors=[
-                ft.colors.with_opacity(0.2, primary_color),
-                ft.colors.with_opacity(0.1, accent_color),
-                ft.colors.BLACK,
+                ft.Colors.with_opacity(0.4, primary_color),
+                ft.Colors.with_opacity(0.2, accent_color),
+                ft.Colors.BLACK,
             ],
-        )
+        ),
     )
 
     page.add(background)

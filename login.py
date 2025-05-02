@@ -7,17 +7,17 @@ def main(page: ft.Page):
     page.title = "Login - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.colors.BLACK
+    page.bgcolor = ft.Colors.BLACK
     page.padding = 0
     page.scroll = None
 
     # Custom colors
-    primary_color = ft.colors.BLUE_600
-    accent_color = ft.colors.CYAN_400
+    primary_color = ft.Colors.BLUE_600
+    accent_color = ft.Colors.CYAN_400
     card_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
-        colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
+        colors=[ft.Colors.BLUE_GREY_800, ft.Colors.BLUE_GREY_900]
     )
 
     # AlertDialog function
@@ -27,11 +27,11 @@ def main(page: ft.Page):
             title=ft.Text(title),
             content=ft.Text(
                 message,
-                color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+                color=ft.Colors.GREEN_600 if is_success else ft.Colors.RED_600 if is_error else ft.Colors.BLACK
             ),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.colors.WHITE
+            bgcolor=ft.Colors.WHITE
         )
 
         def close_dialog():
@@ -50,12 +50,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.PERSON_OUTLINE,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
     )
     password = ft.TextField(
         label="Password",
@@ -65,12 +65,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.LOCK_OUTLINE,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
     )
     role_dropdown = ft.Dropdown(
         label="Login As",
@@ -83,12 +83,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.25, ft.colors.BLACK),
+        bgcolor=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
         border_radius=10,
         prefix_icon=ft.icons.GROUP,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
     )
 
     # Helper function to reset field borders
@@ -104,7 +104,7 @@ def main(page: ft.Page):
         missing_fields = []
         for field, value in fields:
             if not value:
-                field.border_color = ft.colors.RED_400
+                field.border_color = ft.Colors.RED_400
                 missing_fields.append(field.label)
         page.update()
         if len(missing_fields) == 1:
@@ -140,29 +140,27 @@ def main(page: ft.Page):
             cursor = conn.cursor()
 
             table = "admins" if role == "admin" else "teachers"
-            # Modified query to fetch both password and name (for teachers)
             if role == "admin":
                 cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
-            else:
-                cursor.execute(f"SELECT password, Teacher_ID FROM {table} WHERE username=%s", (uname,))
-            
-            result = cursor.fetchone()
-            conn.close()
-
-            if result:
-                if result[0] == pwd:
+                result = cursor.fetchone()
+                if result and result[0] == pwd:
+                    page.controls.clear()
+                    show_main(page)  # Navigate to admin dashboard first
                     show_alert_dialog("Success", "Login successful!", is_success=True)
-                    if role == "admin":
-                        show_main(page)
-                    else:
-                        # For teachers, get the name from the query result (second column)
-                        teacher_id = result[1] if result[1] else "Teacher"  # Fallback if name is null
-                        teacher_dashboard(page, teacher_id)
-                    return
                 else:
-                    show_alert_dialog("Login Failed", "Incorrect password", is_error=True)
-            else:
-                show_alert_dialog("Login Failed", "Username not found", is_error=True)
+                    show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
+            else:  # teacher
+                cursor.execute(f"SELECT password, Teacher_ID FROM {table} WHERE username=%s", (uname,))
+                result = cursor.fetchone()
+                if result and result[0] == pwd:
+                    teacher_id = result[1] if result[1] else "Teacher"
+                    page.controls.clear()
+                    teacher_dashboard(page, teacher_id)  # Navigate to teacher dashboard first
+                    show_alert_dialog("Success", "Login successful!", is_success=True)
+                else:
+                    show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
+
+            conn.close()
 
         except mysql.connector.Error as err:
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -175,11 +173,11 @@ def main(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=30, vertical=15),
             bgcolor=primary_color,
-            color=ft.colors.WHITE,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
 
@@ -191,16 +189,16 @@ def main(page: ft.Page):
                     "Face Recognition System",
                     size=28,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.colors.WHITE,
+                    color=ft.Colors.WHITE,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
                     "Login to continue",
                     size=16,
-                    color=ft.colors.BLUE_200,
+                    color=ft.Colors.BLUE_200,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 username,
                 password,
                 role_dropdown,
@@ -217,7 +215,7 @@ def main(page: ft.Page):
         shadow=ft.BoxShadow(
             blur_radius=30,
             spread_radius=5,
-            color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
+            color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
         ),
         animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
         scale=ft.transform.Scale(scale=1.0),
@@ -235,9 +233,9 @@ def main(page: ft.Page):
             center=ft.Alignment(0, -0.8),
             radius=1.5,
             colors=[
-                ft.colors.with_opacity(0.2, primary_color),
-                ft.colors.with_opacity(0.1, accent_color),
-                ft.colors.BLACK,
+                ft.Colors.with_opacity(0.2, primary_color),
+                ft.Colors.with_opacity(0.1, accent_color),
+                ft.Colors.BLACK,
             ],
         ),
     )

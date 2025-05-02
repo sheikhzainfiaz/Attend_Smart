@@ -1,6 +1,8 @@
 import flet as ft
 import mysql.connector
 import logging
+from back_button import create_back_button
+from Dash import show_main
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -8,16 +10,16 @@ def main(page: ft.Page):
     page.title = "Course Management - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.colors.BLACK
+    page.bgcolor = ft.Colors.BLACK
     page.padding = 0
     page.scroll = ft.ScrollMode.AUTO
 
-    primary_color = ft.colors.BLUE_600
-    accent_color = ft.colors.CYAN_400
+    primary_color = ft.Colors.BLUE_600
+    accent_color = ft.Colors.CYAN_400
     card_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
-        colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
+        colors=[ft.Colors.BLUE_GREY_800, ft.Colors.BLUE_GREY_900]
     )
 
     def show_alert_dialog(title, message, is_success=False, is_error=False):
@@ -28,13 +30,13 @@ def main(page: ft.Page):
                 title=ft.Text(title),
                 content=ft.Text(
                     message,
-                    color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
+                    color=ft.Colors.GREEN_600 if is_success else ft.Colors.RED_600 if is_error else ft.Colors.BLACK
                 ),
                 actions=[
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                bgcolor=ft.colors.WHITE
+                bgcolor=ft.Colors.WHITE
             )
 
             def close_dialog():
@@ -62,7 +64,7 @@ def main(page: ft.Page):
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.colors.BLUE_800
+            bgcolor=ft.Colors.BLUE_800
         )
 
         def close_dialog():
@@ -80,12 +82,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.CODE,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
     )
 
@@ -96,12 +98,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.BOOK,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
     )
 
@@ -118,12 +120,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.HOURGLASS_TOP,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
     )
 
@@ -134,12 +136,12 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.SEARCH,
-        text_style=ft.TextStyle(color=ft.colors.WHITE),
-        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         on_change=lambda e: update_table(e.control.value.strip()),
         width=720,
     )
@@ -147,18 +149,18 @@ def main(page: ft.Page):
     # Data table
     data_table = ft.DataTable(
         border=ft.Border(
-            top=ft.BorderSide(1, ft.colors.BLUE_200),
-            bottom=ft.BorderSide(1, ft.colors.BLUE_200),
-            left=ft.BorderSide(1, ft.colors.BLUE_200),
-            right=ft.BorderSide(1, ft.colors.BLUE_200),
+            top=ft.BorderSide(1, ft.Colors.BLUE_200),
+            bottom=ft.BorderSide(1, ft.Colors.BLUE_200),
+            left=ft.BorderSide(1, ft.Colors.BLUE_200),
+            right=ft.BorderSide(1, ft.Colors.BLUE_200),
         ),
-        heading_row_color=ft.colors.with_opacity(0.1, ft.colors.BLUE_600),
-        heading_text_style=ft.TextStyle(color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
+        heading_row_color=ft.Colors.with_opacity(0.1, ft.Colors.BLUE_600),
+        heading_text_style=ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
         columns=[
-            ft.DataColumn(ft.Text("Course ID", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Course Code", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Course Name", color=ft.colors.WHITE)),
-            ft.DataColumn(ft.Text("Credit Hours", color=ft.colors.WHITE)),
+            ft.DataColumn(ft.Text("Course ID", color=ft.Colors.WHITE)),
+            ft.DataColumn(ft.Text("Course Code", color=ft.Colors.WHITE)),
+            ft.DataColumn(ft.Text("Course Name", color=ft.Colors.WHITE)),
+            ft.DataColumn(ft.Text("Credit Hours", color=ft.Colors.WHITE)),
         ],
         rows=[]
     )
@@ -176,7 +178,7 @@ def main(page: ft.Page):
         missing_fields = []
         for field, value in fields:
             if not value:
-                field.border_color = ft.colors.RED_400
+                field.border_color = ft.Colors.RED_400
                 missing_fields.append(field.label)
         page.update()
         if len(missing_fields) == 1:
@@ -219,10 +221,10 @@ def main(page: ft.Page):
             data_table.rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(str(course_id), color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(course_code_val, color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(course_name_val, color=ft.colors.WHITE)),
-                        ft.DataCell(ft.Text(str(credit_hours_val), color=ft.colors.WHITE)),
+                        ft.DataCell(ft.Text(str(course_id), color=ft.Colors.WHITE)),
+                        ft.DataCell(ft.Text(course_code_val, color=ft.Colors.WHITE)),
+                        ft.DataCell(ft.Text(course_name_val, color=ft.Colors.WHITE)),
+                        ft.DataCell(ft.Text(str(credit_hours_val), color=ft.Colors.WHITE)),
                     ],
                     on_select_changed=lambda e, cid=course_id: select_course(cid)
                 )
@@ -362,11 +364,11 @@ def main(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
             bgcolor=primary_color,
-            color=ft.colors.WHITE,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
     update_btn = ft.ElevatedButton(
@@ -375,12 +377,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.colors.AMBER_600,
-            color=ft.colors.WHITE,
+            bgcolor=ft.Colors.AMBER_600,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
     delete_btn = ft.ElevatedButton(
@@ -389,12 +391,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.colors.RED_600,
-            color=ft.colors.WHITE,
+            bgcolor=ft.Colors.RED_600,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
     clear_btn = ft.ElevatedButton(
@@ -403,12 +405,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.colors.GREY_600,
-            color=ft.colors.WHITE,
+            bgcolor=ft.Colors.GREY_600,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
 
@@ -419,7 +421,7 @@ def main(page: ft.Page):
             expand=True,
             alignment=ft.MainAxisAlignment.CENTER,
         ),
-        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
+        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
         border_radius=10,
         padding=10,
         expand=True,
@@ -434,16 +436,16 @@ def main(page: ft.Page):
                     "Course Management",
                     size=28,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.colors.WHITE,
+                    color=ft.Colors.WHITE,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
                     "Add, update, or delete course records",
                     size=16,
-                    color=ft.colors.BLUE_200,
+                    color=ft.Colors.BLUE_200,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 ft.Column(
                     [
                         course_code,
@@ -457,7 +459,7 @@ def main(page: ft.Page):
                     ],
                     spacing=15,
                 ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 search_field,
                 data_table_container,
             ],
@@ -472,24 +474,40 @@ def main(page: ft.Page):
         shadow=ft.BoxShadow(
             blur_radius=30,
             spread_radius=5,
-            color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
+            color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
         ),
         animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
         scale=ft.transform.Scale(scale=1.0),
         on_hover=lambda e: card.update(scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0))
     )
 
+    # Create back button for admin dashboard
+    back_btn = create_back_button(
+        page,
+        show_main,
+        primary_color=primary_color,
+        teacher_id=None,
+        on_click=lambda e: [page.controls.clear(), show_main(page)]
+    )
+
     background = ft.Container(
-        content=card,
+        content=ft.Stack([
+            card,
+            ft.Container(
+                content=back_btn,
+                top=10,
+                left=10,
+            ),
+        ]),
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
             center=ft.Alignment(0, -0.8),
             radius=1.5,
             colors=[
-                ft.colors.with_opacity(0.2, primary_color),
-                ft.colors.with_opacity(0.1, accent_color),
-                ft.colors.BLACK,
+                ft.Colors.with_opacity(0.2, primary_color),
+                ft.Colors.with_opacity(0.1, accent_color),
+                ft.Colors.BLACK,
             ],
         ),
     )

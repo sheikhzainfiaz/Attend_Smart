@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 import face_recognition
 import logging
+from back_button import create_back_button
+from Dash import show_main
 
 # Constants
 IMAGE_DIR = "photos"
@@ -22,17 +24,17 @@ def main(page: ft.Page):
     page.window_resizable = True
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.colors.BLACK
+    page.bgcolor = ft.Colors.BLACK
     page.padding = 0
     page.scroll = None
 
     # Colors
-    primary_color = ft.colors.BLUE_600
-    accent_color = ft.colors.CYAN_400
+    primary_color = ft.Colors.BLUE_600
+    accent_color = ft.Colors.CYAN_400
     card_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
-        colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
+        colors=[ft.Colors.BLUE_GREY_800, ft.Colors.BLUE_GREY_900]
     )
 
     def show_alert_dialog(title, message):
@@ -102,11 +104,11 @@ def main(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
             bgcolor=primary_color,
-            color=ft.colors.WHITE,
+            color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
         ),
     )
 
@@ -118,16 +120,16 @@ def main(page: ft.Page):
                     "Train Face Recognition Model",
                     size=28,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.colors.WHITE,
+                    color=ft.Colors.WHITE,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
                     "Click the button below to encode student faces",
                     size=16,
-                    color=ft.colors.BLUE_200,
+                    color=ft.Colors.BLUE_200,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 ft.Row(
                     [train_button],
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -145,7 +147,7 @@ def main(page: ft.Page):
         shadow=ft.BoxShadow(
             blur_radius=30,
             spread_radius=5,
-            color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
+            color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
         ),
         animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
         scale=ft.transform.Scale(scale=1.0),
@@ -154,18 +156,34 @@ def main(page: ft.Page):
         ),
     )
 
+    # Create back button for admin dashboard
+    back_btn = create_back_button(
+        page,
+        show_main,
+        primary_color=primary_color,
+        teacher_id=None,
+        on_click=lambda e: [page.controls.clear(), show_main(page)]
+    )
+
     # Background with radial gradient
     background = ft.Container(
-        content=card,
+        content=ft.Stack([
+            card,
+            ft.Container(
+                content=back_btn,
+                top=10,
+                left=10,
+            ),
+        ]),
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
             center=ft.Alignment(0, 0),
             radius=2.0,
             colors=[
-                ft.colors.with_opacity(0.4, primary_color),
-                ft.colors.with_opacity(0.2, accent_color),
-                ft.colors.BLACK,
+                ft.Colors.with_opacity(0.4, primary_color),
+                ft.Colors.with_opacity(0.2, accent_color),
+                ft.Colors.BLACK,
             ],
         ),
     )
