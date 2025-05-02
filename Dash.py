@@ -31,6 +31,11 @@ def open_enrollment_details(page: ft.Page):
     page.controls.clear()
     import Enrollment
     Enrollment.main(page)
+    
+def open_train_data(page: ft.Page):
+    page.controls.clear()
+    import train
+    train.main(page)
 
 def show_main(page: ft.Page):
     logging.debug("Starting main function")
@@ -192,7 +197,7 @@ def show_main(page: ft.Page):
             )
 
             button_data_row1 = [
-                ("Train Data", ft.Icons.CAST_FOR_EDUCATION, lambda e: show_sub_page("Train Data")),
+                ("Train Data", ft.Icons.CAST_FOR_EDUCATION, lambda e: open_train_data(page)),
                 ("Student Details", ft.Icons.PERSON, lambda e: open_student_details(page)),
                 ("Teacher Details", ft.Icons.PERSON_OUTLINE, lambda e: open_teacher_details(page)),
                 ("Course Details", ft.Icons.BOOK, lambda e: open_course_details(page)),
