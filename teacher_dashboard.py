@@ -1,8 +1,7 @@
 import flet as ft
 import mysql.connector
 import logging
-from manage_attendance import main_manage
-from mark_attendance import main
+import asyncio
 
 def configure_logging():
     """Configure logging after all imports are resolved to avoid circular imports."""
@@ -13,12 +12,22 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
     configure_logging()
     logging.debug("Starting teacher_dashboard function")
 
+    # Delayed imports to avoid circular imports
+    from mark_attendance import main
+    try:
+        from manage_attendance import main_manage
+    except ImportError as e:
+        logging.error(f"Failed to import main_manage: {e}")
+        def main_manage(page, teacher_id):
+            page.controls.clear()
+            page.add(ft.Text(f"Error: manage_attendance not found - {e}", color=ft.colors.RED_700))
+            page.update()
+
     page.title = "Teacher Dashboard - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.colors.BLACK
-    page.padding = 0  # Remove padding to eliminate extra space
-    page.scroll = None  # Disable scroll to prevent extra space
+    page.padding = 0
+    page.scroll = None
 
     # Colors
     primary_color = ft.colors.BLUE_600
@@ -43,6 +52,57 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
         )
         page.snack_bar.open = True
         page.update()
+
+    def show_confirm_dialog(title, message, on_confirm):
+        async def handle_confirm(e):
+            logging.debug("Confirm dialog: Yes clicked")
+            dialog.open = False
+            page.update()
+            await on_confirm()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title, style=ft.TextStyle(color=ft.colors.BLACK)),
+            content=ft.Text(message, color=ft.colors.BLACK),
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
+                ft.TextButton("Yes", on_click=handle_confirm)
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.colors.WHITE
+        )
+
+        def close_dialog():
+            logging.debug("Confirm dialog: Cancel clicked")
+            dialog.open = False
+            page.update()
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
+
+    async def logout():
+        logging.debug("Logout started")
+        page.session.clear()  # Clear session if used
+        page.controls.clear()
+        page.update()
+        await redirect_to_login(page)
+
+    async def redirect_to_login(page):
+        try:
+            logging.debug("Redirecting to login page")
+            # Placeholder: Uncomment and update with your login.py main function name
+            # from login import main as login_main  # Update 'main' to your login.py's main function name
+            # login_main(page)
+            # page.update()
+            # logging.debug("Logout completed")
+            # Temporary placeholder until login.py is shared
+            page.add(ft.Text("Redirected to login page (placeholder)", color=ft.colors.WHITE))
+            page.update()
+            logging.debug("Logout completed (placeholder)")
+        except Exception as e:
+            logging.error(f"Error redirecting to login: {e}")
+            show_message(f"Failed to redirect to login: {e}", is_error=True)
 
     # Fetch teacher's name from the database
     def fetch_teacher_name():
@@ -123,7 +183,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=15,
-                expand=True,  # Ensure the column takes up all available space
+                expand=True,
             ),
             padding=40,
             width=800,
@@ -135,23 +195,19 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
             ),
             animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-            scale=ft.transform.Scale(scale=1.0),
-            on_hover=lambda e: e.control.update(
-                scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
-            ),
         )
 
         background = ft.Container(
             content=card,
             alignment=ft.alignment.center,
-            expand=True,  # Ensure the container takes up the full page
+            expand=True,
             gradient=ft.RadialGradient(
                 center=ft.Alignment(0, 0),
                 radius=2.0,
                 colors=[
                     ft.colors.with_opacity(0.4, primary_color),
                     ft.colors.with_opacity(0.2, accent_color),
-                    ft.colors.BLACK,
+                    ft.colors.with_opacity(0.1, ft.colors.BLUE_GREY_900),
                 ],
             ),
         )
@@ -163,10 +219,25 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
         page.controls.clear()
         page.update()
 
+        def open_manage_attendance(e):
+            """Open Manage Attendance in the same window due to threading issues."""
+            try:
+                logging.debug("Attempting to open manage_attendance")
+                page.controls.clear()
+                main_manage(page, teacher_id)
+                logging.debug("Loaded manage_attendance in current window")
+            except Exception as e:
+                logging.error(f"Failed to open manage_attendance: {e}")
+                show_message(f"Error opening Manage Attendance: {e}", is_error=True)
+
         button_data = [
             ("Mark Attendance", ft.icons.EVENT, lambda e: main(page, teacher_id)),
-            ("Manage Attendance", ft.icons.LIST, lambda e: main_manage(page, teacher_id)),
-            ("Exit", ft.icons.EXIT_TO_APP, lambda e: page.window_close()),
+            ("Manage Attendance", ft.icons.LIST, open_manage_attendance),
+            ("Exit", ft.icons.EXIT_TO_APP, lambda e: show_confirm_dialog(
+                "Confirm Logout",
+                "Are you sure you want to log out?",
+                logout
+            )),
         ]
 
         buttons = []
@@ -198,11 +269,6 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                     overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
                 ),
                 on_click=handler,
-                scale=ft.transform.Scale(scale=1.0),
-                on_hover=lambda e: e.control.update(
-                    scale=ft.transform.Scale(scale=1.05 if e.data == "true" else 1.0),
-                    elevation=6 if e.data == "true" else 3,
-                ),
             )
             buttons.append(btn)
 
@@ -232,7 +298,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=15,
-                expand=True,  # Ensure the column takes up all available space
+                expand=True,
             ),
             padding=40,
             width=800,
@@ -244,23 +310,19 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
             ),
             animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-            scale=ft.transform.Scale(scale=1.0),
-            on_hover=lambda e: e.control.update(
-                scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
-            ),
         )
 
         background = ft.Container(
             content=card,
             alignment=ft.alignment.center,
-            expand=True,  # Ensure the container takes up the full page
+            expand=True,
             gradient=ft.RadialGradient(
                 center=ft.Alignment(0, 0),
                 radius=2.0,
                 colors=[
                     ft.colors.with_opacity(0.4, primary_color),
                     ft.colors.with_opacity(0.2, accent_color),
-                    ft.colors.BLACK,
+                    ft.colors.with_opacity(0.1, ft.colors.BLUE_GREY_900),
                 ],
             ),
         )

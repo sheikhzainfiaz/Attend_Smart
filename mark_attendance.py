@@ -13,6 +13,8 @@ import cvzone
 import pyttsx3
 import threading
 import time
+from back_button import create_back_button
+from teacher_dashboard import teacher_dashboard
 
 # Constants
 ENCODE_FILE = "EncodeFile.p"
@@ -65,7 +67,6 @@ def main(page: ft.Page, teacher_id=1):
     page.window_resizable = True
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.colors.BLACK
     page.padding = 0
     page.scroll = None
 
@@ -431,9 +432,23 @@ def main(page: ft.Page, teacher_id=1):
         ),
     )
 
-    # Background with radial gradient
+    # Background with radial gradient and Back button
     background = ft.Container(
-        content=card,
+        content=ft.Stack(
+            [
+                card,
+                ft.Container(
+                    content=create_back_button(
+                        page,
+                        teacher_dashboard,
+                        primary_color=primary_color,
+                        teacher_id=teacher_id
+                    ),
+                    top=10,
+                    left=0,
+                ),
+            ]
+        ),
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
@@ -442,7 +457,7 @@ def main(page: ft.Page, teacher_id=1):
             colors=[
                 ft.colors.with_opacity(0.4, primary_color),
                 ft.colors.with_opacity(0.2, accent_color),
-                ft.colors.BLACK,
+                ft.colors.with_opacity(0.1, ft.colors.BLUE_GREY_900),
             ],
         ),
     )

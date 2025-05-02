@@ -1,10 +1,9 @@
 import flet as ft
 import mysql.connector
 from Dash import show_main
-from teacher_dash import teacher_dashboard
+from teacher_dashboard import teacher_dashboard
 
 def main(page: ft.Page):
-    page.controls.clear()
     page.title = "Login - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
