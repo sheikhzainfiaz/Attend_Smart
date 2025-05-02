@@ -85,24 +85,19 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
         logging.debug("Logout started")
         page.session.clear()  # Clear session if used
         page.controls.clear()
-        page.update()
-        await redirect_to_login(page)
+        page.update()  # Immediate UI update to show logout
+        await redirect_to_login(page)  # Wait for login redirection
 
     async def redirect_to_login(page):
         try:
             logging.debug("Redirecting to login page")
-            # Placeholder: Uncomment and update with your login.py main function name
-            # from login import main as login_main  # Update 'main' to your login.py's main function name
-            # login_main(page)
-            # page.update()
-            # logging.debug("Logout completed")
-            # Temporary placeholder until login.py is shared
-            page.add(ft.Text("Redirected to login page (placeholder)", color=ft.colors.WHITE))
-            page.update()
-            logging.debug("Logout completed (placeholder)")
+            from login import main as login_main  # Import login form
+            login_main(page)  # Redirect to login page
+            page.update()  # Update after login is rendered
+            logging.debug("Logout completed")
         except Exception as e:
-            logging.error(f"Error redirecting to login: {e}")
-            show_message(f"Failed to redirect to login: {e}", is_error=True)
+            logging.error(f"Error in redirect_to_login: {str(e)}")
+            show_message(f"Failed to redirect to login: {str(e)}", is_error=True)
 
     # Fetch teacher's name from the database
     def fetch_teacher_name():
