@@ -43,16 +43,14 @@ def main_manage(page: ft.Page, teacher_id=1):
         page.update()
 
     def go_back(e):
-        if len(page.views) > 1:  # Ensure there's a previous view to go back to
-            page.views.pop()  # Remove the current view
-            page.go(page.views[-1].route)  # Navigate to the previous view
+        if len(page.views) > 1:
+            page.views.pop()
+            page.go(page.views[-1].route)
         else:
             show_alert_dialog("Info", "No previous page to go back to.")
 
-    # Dummy Teacher_ID for testing
     DUMMY_TEACHER_ID = teacher_id
 
-    # Single Dropdown for Course and Section
     course_section_dropdown = ft.Dropdown(
         label="Select Course and Section",
         options=[],
@@ -68,7 +66,6 @@ def main_manage(page: ft.Page, teacher_id=1):
         on_change=lambda e: update_table()
     )
 
-    # Date input
     selected_date = ft.Ref[str]()
     selected_date.current = datetime.now().strftime("%Y-%m-%d")
 
@@ -86,7 +83,6 @@ def main_manage(page: ft.Page, teacher_id=1):
         on_submit=lambda e: update_selected_date(e.control.value)
     )
 
-    # Status message
     status_text = ft.Text("", color=ft.colors.GREEN_400, size=16, text_align=ft.TextAlign.CENTER)
 
     def clear_status_text():
@@ -125,7 +121,6 @@ def main_manage(page: ft.Page, teacher_id=1):
             date_input.value = selected_date.current
         page.update()
 
-    # Data table for students and attendance (editable)
     data_table = ft.DataTable(
         border=ft.Border(
             top=ft.BorderSide(1, ft.colors.BLUE_200),
@@ -190,21 +185,9 @@ def main_manage(page: ft.Page, teacher_id=1):
             )
             cursor = conn.cursor()
             
-            if new_status == "Not Recorded":
-                cursor.execute("""
-                    DELETE FROM attendance
-                    WHERE Roll_no = %s
-                    AND Teacher_ID = %s
-                    AND CourseID = %s
-                    AND SectionID = %s
-                    AND Attendance_Date = %s
-                """, (roll_no, DUMMY_TEACHER_ID, course_id, section_id, selected_date.current))
-                conn.commit()
-                logging.debug(f"Deleted attendance record for Roll No: {roll_no}")
-                set_status_text(f"Attendance removed for Roll No: {roll_no}")
-            
-            elif old_status == "Not Recorded":
-                now = datetime.now()
+            now = datetime.now()
+            if old_status == "Absent":
+                # Insert new record for previously unrecorded (now Absent) attendance
                 cursor.execute("""
                     INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -212,9 +195,8 @@ def main_manage(page: ft.Page, teacher_id=1):
                 conn.commit()
                 logging.debug(f"Inserted new attendance record for Roll No: {roll_no}, Status: {new_status}")
                 set_status_text(f"Attendance set to {new_status} for Roll No: {roll_no}")
-            
             else:
-                now = datetime.now()
+                # Update existing record
                 cursor.execute("""
                     UPDATE attendance
                     SET Status = %s, Attendance_Time = %s
@@ -307,14 +289,13 @@ def main_manage(page: ft.Page, teacher_id=1):
                 return
             
             for roll_no, full_name, status, attendance_time in students:
-                current_status = status if status else "Not Recorded"
+                current_status = status if status else "Absent"
                 time_display = str(attendance_time) if attendance_time else "Not Recorded"
                 status_dropdown = ft.Dropdown(
                     value=current_status,
                     options=[
                         ft.dropdown.Option("Present"),
-                        ft.dropdown.Option("Absent"),
-                        ft.dropdown.Option("Not Recorded")
+                        ft.dropdown.Option("Absent")
                     ],
                     border_color=accent_color,
                     focused_border_color=primary_color,
@@ -339,7 +320,6 @@ def main_manage(page: ft.Page, teacher_id=1):
             logging.debug(f"Error fetching data: {e}")
             show_alert_dialog("Error", f"Error fetching students: {e}")
 
-    # Back button
     back_button = ft.ElevatedButton(
         content=ft.Row([
             ft.Icon(ft.icons.ARROW_BACK, color=ft.colors.WHITE),
@@ -353,7 +333,6 @@ def main_manage(page: ft.Page, teacher_id=1):
         )
     )
 
-    # Buttons
     btns = ft.Row([
         date_input,
         ft.ElevatedButton(
@@ -370,7 +349,7 @@ def main_manage(page: ft.Page, teacher_id=1):
 
     card = ft.Container(
         content=ft.Column([
-            ft.Row([back_button], alignment=ft.MainAxisAlignment.START),  # Back button at top-left
+            ft.Row([back_button], alignment=ft.MainAxisAlignment.START),
             ft.Text("Attendance Management", size=28, weight=ft.FontWeight.BOLD, color=ft.colors.WHITE),
             course_section_dropdown,
             btns,
