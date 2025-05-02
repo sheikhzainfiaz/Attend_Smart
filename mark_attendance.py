@@ -324,7 +324,7 @@ def main(page: ft.Page, teacher_id=1):
                 label = "Unknown"
                 color = (0, 0, 255)
 
-                if matches[best_match_index]:
+                if face_distances[best_match_index]<0.4:
                     roll_no = roll_numbers[best_match_index]
                     logging.debug(f"Match found: Roll No {roll_no}, Distance: {face_distances[best_match_index]}")
                     students_in_section = fetch_students(course_id, section_id)
