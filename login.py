@@ -2,6 +2,10 @@ import flet as ft
 import mysql.connector
 from Dash import show_main
 from teacher_dashboard import teacher_dashboard
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from datetime import datetime
 
 def main(page: ft.Page):
     page.title = "Login - Face Recognition System"
@@ -113,6 +117,28 @@ def main(page: ft.Page):
             return f"The following fields are required: {', '.join(missing_fields)}"
         return None
 
+    def send_login_email(teacher_email, teacher_name):
+        if not teacher_email or not isinstance(teacher_email, str) or teacher_email.strip() == "":
+            return  # Skip if email is invalid or empty
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = Mail(
+            from_email='attendsmartofficial@gmail.com',
+            to_emails=teacher_email,
+            subject='Attend Smart: Successful Login Notification',
+            html_content=f"""
+            <h2>Login Notification</h2>
+            <p>Hello,<strong> {teacher_name} </strong></p>
+            <p>You successfully logged in to Attend Smart - Facial Recognition Attendance System at <strong>{current_time}</strong>.</p>
+            """)
+
+        try:
+            sg = SendGridAPIClient(api_key=os.getenv('SENDGRID_API_KEY'))
+            response = sg.send(message)
+            print(f"Email sent to {teacher_email}: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending email to {teacher_email}: {e}")
+
     def login_click(e):
         uname = username.value.strip() if username.value else ""
         pwd = password.value.strip() if password.value else ""
@@ -150,13 +176,16 @@ def main(page: ft.Page):
                 else:
                     show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
             else:  # teacher
-                cursor.execute(f"SELECT password, Teacher_ID FROM {table} WHERE username=%s", (uname,))
+                cursor.execute(f"SELECT password, Teacher_ID, Email, Full_Name FROM {table} WHERE username=%s", (uname,))
                 result = cursor.fetchone()
                 if result and result[0] == pwd:
                     teacher_id = result[1] if result[1] else "Teacher"
+                    teacher_email = result[2] if result[2] else None
+                    teacher_name = result[3] if result[3] else "Teacher"
                     page.controls.clear()
                     teacher_dashboard(page, teacher_id)  # Navigate to teacher dashboard first
-                    show_alert_dialog("Success", "Login successful!", is_success=True)
+                    send_login_email(teacher_email, teacher_name)  # Send email if valid
+                    # No success dialog for teacher
                 else:
                     show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
 

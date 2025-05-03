@@ -1,0 +1,8 @@
+1) set this api key with same name in both envrironmental variables -> user and system variables
+2) open pref user settings json is vs code and write the following command
+then save the file and restart the vs code
+    "terminal.integrated.env.windows": {
+        "SENDGRID_API_KEY": "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"
+    }
+
+

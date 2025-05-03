@@ -97,7 +97,7 @@ VALUES
 
 
 INSERT INTO teachers (Full_Name, Email, Phone, Username, Password)
-VALUES ('Kasloom', 'kasloom@ntu.edu.pk', '03001234567', 'kasloom', 'kas123');
+VALUES ('Kalsoom', 'kalsoom@ntu.edu.pk', '03001234567', 'kasloom', 'kas123');
 INSERT INTO teachers (Full_Name, Email, Phone, Username, Password)
 VALUES ('Abdul Qadir', 'qadir@ntu.edu.pk', '03111234567', 'qadir', 'qadir123');
 
