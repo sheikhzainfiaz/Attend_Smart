@@ -303,7 +303,7 @@ def main_manage(page: ft.Page, teacher_id=1):
 
                 # Create email with attachment
                 message = Mail(
-                    from_email='noreply@mzstyle.top',
+                    from_email='support@mzstyle.top',
                     to_emails=teacher_email,
                     subject=f'Attend Smart: Attendance Report for {course_name} on {selected_date.current}',
                     html_content=f"""

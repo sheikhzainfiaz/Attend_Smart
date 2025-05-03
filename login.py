@@ -123,7 +123,7 @@ def main(page: ft.Page):
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         message = Mail(
-            from_email='noreply@mzstyle.top',
+            from_email='support@mzstyle.top',
             to_emails=teacher_email,
             subject='Attend Smart: Successful Login Notification',
             html_content=f"""
