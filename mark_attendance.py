@@ -360,7 +360,7 @@ def main(page: ft.Page, teacher_id=1):
 
             # Create email with attachment
             message = Mail(
-                from_email='attendsmartofficial@gmail.com',
+                from_email='noreply@mzstyle.top',
                 to_emails=teacher_email,
                 subject=f'Attend Smart: Attendance Report for {course_name} on {current_date}',
                 html_content=f"""
