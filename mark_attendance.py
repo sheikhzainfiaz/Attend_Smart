@@ -13,8 +13,14 @@ import cvzone
 import pyttsx3
 import threading
 import time
+import pandas as pd
+import io
+import base64
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 from back_button import create_back_button
 from teacher_dashboard import teacher_dashboard
+from manage_attendance import main_manage  # Import manage_attendance module
 
 # Constants
 ENCODE_FILE = "EncodeFile.p"
@@ -79,12 +85,12 @@ def main(page: ft.Page, teacher_id=1):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    def show_alert_dialog(title, message):
+    def show_alert_dialog(title, message, actions=None):
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text(title),
             content=ft.Text(message),
-            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
+            actions=actions or [ft.TextButton("OK", on_click=lambda e: close_dialog())],
             actions_alignment=ft.MainAxisAlignment.END
         )
 
@@ -246,6 +252,157 @@ def main(page: ft.Page, teacher_id=1):
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
 
+    def complete_attendance(e):
+        logging.debug("Complete Attendance button clicked")
+        if not course_dropdown.value:
+            show_alert_dialog("Error", "Please select a course and section!")
+            return
+
+        def handle_send_email(e):
+            page.overlay[-1].open = False  # Close dialog
+            page.update()
+            send_attendance_email()
+
+        def handle_modify_attendance(e):
+            page.overlay[-1].open = False  # Close dialog
+            page.controls.clear()
+            main_manage(page, teacher_id)  # Navigate to manage attendance
+            page.update()
+
+        # Show confirmation dialog
+        show_alert_dialog(
+            "Complete Attendance",
+            "Do you want to send the attendance email or modify the attendance?",
+            actions=[
+                ft.TextButton("Send Email", on_click=handle_send_email),
+                ft.TextButton("Modify Attendance", on_click=handle_modify_attendance),
+            ]
+        )
+
+    def send_attendance_email():
+        logging.debug("Generating and sending attendance email")
+        if not course_dropdown.value:
+            show_alert_dialog("Error", "Please select a course and section!")
+            return
+
+        try:
+            import openpyxl  # Check if openpyxl is available
+        except ImportError:
+            logging.error("openpyxl module not found")
+            show_alert_dialog(
+                "Error",
+                "Required module 'openpyxl' not found. Please install it using 'pip install openpyxl'."
+            )
+            return
+
+        try:
+            # Retrieve teacher's email
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (teacher_id,))
+            teacher_result = cursor.fetchone()
+            if not teacher_result or not teacher_result[0]:
+                conn.close()
+                show_alert_dialog("Error", "Teacher's email address not found in the database.")
+                return
+            teacher_email, teacher_name = teacher_result
+
+            # Fetch attendance data for current date
+            course_id, section_id = map(int, course_dropdown.value.split(":"))
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            query = """
+                SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
+                FROM student s
+                LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                    AND a.Teacher_ID = %s
+                    AND a.CourseID = %s
+                    AND a.SectionID = %s
+                    AND a.Attendance_Date = %s
+                WHERE s.SectionID = %s
+            """
+            params = (teacher_id, course_id, section_id, current_date, section_id)
+            cursor.execute(query, params)
+            students = cursor.fetchall()
+            conn.close()
+
+            if not students:
+                show_alert_dialog("No Data", f"No attendance records found for {current_date}.")
+                return
+
+            # Prepare data for Excel
+            data = []
+            for roll_no, full_name, status, attendance_time in students:
+                data.append({
+                    "Roll No": roll_no,
+                    "Name": full_name,
+                    "Status": status if status else "Absent",
+                    "Time": str(attendance_time) if attendance_time else "Not Recorded"
+                })
+
+            # Create DataFrame
+            df = pd.DataFrame(data)
+
+            # Generate course and section name for filename
+            course_name = course_dropdown.options[
+                [opt.key for opt in course_dropdown.options].index(f"{course_id}:{section_id}")
+            ].text.replace(" - ", "_").replace(" (Section:", "_").replace(")", "").replace(" ", "_")
+            filename = f"Attendance_{course_name}_{current_date}.xlsx"
+
+            # Create Excel file in memory
+            output = io.BytesIO()
+            df.to_excel(output, index=False, engine='openpyxl')
+            output.seek(0)
+            excel_data = output.read()
+            output.close()
+
+            # Encode Excel file as base64
+            encoded_file = base64.b64encode(excel_data).decode()
+
+            # Create email with attachment
+            message = Mail(
+                from_email='attendsmartofficial@gmail.com',
+                to_emails=teacher_email,
+                subject=f'Attend Smart: Attendance Report for {course_name} on {current_date}',
+                html_content=f"""
+                <h2>Attendance Report</h2>
+                <p>Hello, {teacher_name}</p>
+                <p>Attached is the attendance report for {course_name} on {current_date}.</p>
+                <p>Best regards,<br>Attend Smart Team</p>
+                """
+            )
+
+            # Add attachment
+            attachment = Attachment(
+                FileContent(encoded_file),
+                FileName(filename),
+                FileType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                Disposition('attachment')
+            )
+            message.attachment = attachment
+
+            # Send email
+            sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+            if not sendgrid_api_key:
+                show_alert_dialog("Error", "SendGrid API key not found. Please set the SENDGRID_API_KEY environment variable.")
+                return
+
+            sg = SendGridAPIClient(api_key=sendgrid_api_key)
+            try:
+                response = sg.send(message)
+                logging.debug(f"Email sent to {teacher_email}: Status Code {response.status_code}")
+                set_status_text(f"Attendance report emailed to {teacher_email} successfully!")
+            except Exception as e:
+                logging.error(f"Failed to send email: {str(e)}")
+                if hasattr(e, 'body'):
+                    logging.error(f"SendGrid response body: {e.body}")
+                if hasattr(e, 'status_code'):
+                    logging.error(f"SendGrid status code: {e.status_code}")
+                show_alert_dialog("Error", f"Failed to send attendance report: {str(e)}")
+
+        except Exception as e:
+            logging.error(f"Error generating or sending Excel: {e}")
+            show_alert_dialog("Error", f"Failed to send attendance report: {e}")
+
     stop_camera = False
 
     def mark_attendance_with_camera(e):
@@ -324,7 +481,7 @@ def main(page: ft.Page, teacher_id=1):
                 label = "Unknown"
                 color = (0, 0, 255)
 
-                if face_distances[best_match_index]<0.4:
+                if face_distances[best_match_index] < 0.4:
                     roll_no = roll_numbers[best_match_index]
                     logging.debug(f"Match found: Roll No {roll_no}, Distance: {face_distances[best_match_index]}")
                     students_in_section = fetch_students(course_id, section_id)
@@ -381,6 +538,22 @@ def main(page: ft.Page, teacher_id=1):
         ),
     )
 
+    # Complete Attendance button
+    complete_button = ft.ElevatedButton(
+        text="Complete Attendance",
+        on_click=complete_attendance,
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=12),
+            padding=ft.padding.symmetric(horizontal=20, vertical=15),
+            bgcolor=primary_color,
+            color=ft.colors.WHITE,
+            elevation={"default": 5, "hovered": 8},
+            animation_duration=300,
+            text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
+            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
+        ),
+    )
+
     # Card layout
     card = ft.Container(
         content=ft.Column(
@@ -403,7 +576,7 @@ def main(page: ft.Page, teacher_id=1):
                     [
                         course_dropdown,
                         ft.Row(
-                            [mark_button],
+                            [mark_button, complete_button],
                             alignment=ft.MainAxisAlignment.CENTER,
                             spacing=10,
                         ),

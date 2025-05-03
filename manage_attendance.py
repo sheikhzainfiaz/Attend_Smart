@@ -4,6 +4,12 @@ import logging
 from datetime import datetime
 import re
 import threading
+import pandas as pd
+import io
+import base64
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 from back_button import create_back_button
 from teacher_dashboard import teacher_dashboard
 
@@ -19,7 +25,7 @@ def main_manage(page: ft.Page, teacher_id=1):
         page.scroll = ft.ScrollMode.AUTO
         page.window_width = 1280
         page.window_height = 720
-        page.bgcolor = ft.colors.BLUE_GREY_900  # Fallback to avoid black areas
+        page.bgcolor = ft.colors.BLUE_GREY_900
 
         primary_color = ft.colors.BLUE_600
         accent_color = ft.colors.CYAN_400
@@ -211,6 +217,127 @@ def main_manage(page: ft.Page, teacher_id=1):
                 logging.error(f"Error updating attendance: {e}")
                 show_alert_dialog("Error", f"Failed to update attendance: {e}")
 
+        def generate_excel():
+            logging.debug("Generating and sending Excel file via email")
+            if not course_section_dropdown.value or not selected_date.current:
+                show_alert_dialog("Error", "Please select a course, section, and valid date.")
+                return
+
+            try:
+                import openpyxl  # Check if openpyxl is available
+            except ImportError:
+                logging.error("openpyxl module not found")
+                show_alert_dialog(
+                    "Error",
+                    "Required module 'openpyxl' not found. Please install it using 'pip install openpyxl'."
+                )
+                return
+
+            try:
+                # Retrieve teacher's email
+                conn = mysql.connector.connect(
+                    host="localhost",
+                    user="root",
+                    password="root",
+                    database="face_db",
+                    port=3306
+                )
+                cursor = conn.cursor()
+                cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (DUMMY_TEACHER_ID,))
+                teacher_result = cursor.fetchone()
+                if not teacher_result or not teacher_result[0]:
+                    conn.close()
+                    show_alert_dialog("Error", "Teacher's email address not found in the database.")
+                    return
+                teacher_email, teacher_name = teacher_result
+
+                # Fetch attendance data
+                course_id, section_id = map(int, course_section_dropdown.value.split(":"))
+                query = """
+                    SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
+                    FROM student s
+                    LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                        AND a.Teacher_ID = %s
+                        AND a.CourseID = %s
+                        AND a.SectionID = %s
+                        AND a.Attendance_Date = %s
+                    WHERE s.SectionID = %s
+                """
+                params = (DUMMY_TEACHER_ID, course_id, section_id, selected_date.current, section_id)
+                cursor.execute(query, params)
+                students = cursor.fetchall()
+                conn.close()
+
+                if not students:
+                    show_alert_dialog("No Data", f"No attendance records found for {selected_date.current}.")
+                    return
+
+                # Prepare data for Excel
+                data = []
+                for roll_no, full_name, status, attendance_time in students:
+                    data.append({
+                        "Roll No": roll_no,
+                        "Name": full_name,
+                        "Status": status if status else "Absent",
+                        "Time": str(attendance_time) if attendance_time else "Not Recorded"
+                    })
+
+                # Create DataFrame
+                df = pd.DataFrame(data)
+
+                # Generate course and section name for filename
+                course_name = course_section_dropdown.options[
+                    [opt.key for opt in course_section_dropdown.options].index(f"{course_id}:{section_id}")
+                ].text.replace(" - ", "_").replace(" ", "_")
+                filename = f"Attendance_{course_name}_{selected_date.current}.xlsx"
+
+                # Create Excel file in memory
+                output = io.BytesIO()
+                df.to_excel(output, index=False, engine='openpyxl')
+                output.seek(0)
+                excel_data = output.read()
+                output.close()
+
+                # Encode Excel file as base64
+                encoded_file = base64.b64encode(excel_data).decode()
+
+                # Create email with attachment
+                message = Mail(
+                    from_email='attendsmartofficial@gmail.com',
+                    to_emails=teacher_email,
+                    subject=f'Attend Smart: Attendance Report for {course_name} on {selected_date.current}',
+                    html_content=f"""
+                    <h2>Attendance Report</h2>
+                    <p>Hello, {teacher_name}</p>
+                    <p>Attached is the attendance report for {course_name} on {selected_date.current}.</p>
+                    <p>Best regards,<br>Attend Smart Team</p>
+                    """
+                )
+
+                # Add attachment
+                attachment = Attachment(
+                    FileContent(encoded_file),
+                    FileName(filename),
+                    FileType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                    Disposition('attachment')
+                )
+                message.attachment = attachment
+
+                # Send email
+                sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+                if not sendgrid_api_key:
+                    show_alert_dialog("Error", "SendGrid API key not found. Please set the SENDGRID_API_KEY environment variable.")
+                    return
+
+                sg = SendGridAPIClient(api_key=sendgrid_api_key)
+                response = sg.send(message)
+                logging.debug(f"Email sent to {teacher_email}: {response.status_code}")
+                set_status_text(f"Attendance report emailed to {teacher_email} successfully!")
+
+            except Exception as e:
+                logging.error(f"Error generating or sending Excel: {e}")
+                show_alert_dialog("Error", f"Failed to send attendance report: {e}")
+
         def update_table():
             logging.debug("Updating table...")
             data_table.rows = []
@@ -327,6 +454,16 @@ def main_manage(page: ft.Page, teacher_id=1):
                     text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
                 )
             ),
+            ft.ElevatedButton(
+                "Send Attendance",
+                on_click=lambda e: generate_excel(),
+                bgcolor=primary_color,
+                color=ft.colors.WHITE,
+                style=ft.ButtonStyle(
+                    padding=ft.padding.symmetric(horizontal=20, vertical=15),
+                    text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                )
+            ),
         ], alignment=ft.MainAxisAlignment.CENTER, spacing=20)
 
         card = ft.Container(
@@ -341,7 +478,7 @@ def main_manage(page: ft.Page, teacher_id=1):
                     margin=0,
                     bgcolor=card_bg,
                     border_radius=10,
-                    height=300,  # Fixed height to prevent collapse
+                    height=300,
                     width=750
                 )
             ], spacing=10, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
@@ -370,8 +507,8 @@ def main_manage(page: ft.Page, teacher_id=1):
             ]),
             alignment=ft.alignment.center,
             expand=True,
-            width=1280,  # Match page width
-            height=720,  # Match page height
+            width=1280,
+            height=720,
             gradient=ft.RadialGradient(
                 center=ft.Alignment(0, 0),
                 radius=2.0,
