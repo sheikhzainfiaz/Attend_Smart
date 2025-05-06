@@ -3,8 +3,53 @@ import mysql.connector
 import logging
 from back_button import create_back_button
 from Dash import show_main
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+
+def send_teacher_notification(teacher_email, teacher_name, teacher_phone, username, password, action="added"):
+    if not teacher_email or not isinstance(teacher_email, str) or teacher_email.strip() == "":
+        return  # Skip if email is invalid or empty
+
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    action_text = "added to" if action == "added" else "updated in"
+    message = Mail(
+        from_email='support@mzstyle.top',
+        to_emails=teacher_email,
+        subject=f'Attend Smart: Teacher {action.capitalize()} Notification',
+        html_content=f"""
+        <h2>Teacher {action.capitalize()} Notification</h2>
+        <p>Hello, <strong>{teacher_name}</strong></p>
+        <p>Your details have been {action_text} the Attend Smart - Facial Recognition Attendance System at <strong>{current_time}</strong>.</p>
+        <p><strong>Your Details:</strong></p>
+        <ul>
+        <p><strong>Your Key Credentials:</strong></p>
+        <ul>
+            <li>Username: {username}</li>
+            <li>Password: {password}</li>
+        </ul>
+            <li>Name: {teacher_name}</li>
+            <li>Email: {teacher_email}</li>
+            <li>Phone: {teacher_phone}</li>
+        </ul>
+        
+            <li>Username: {username}</li>
+            <li>Password: {password}</li>
+        </ul>
+        <p>Please keep your credentials secure and do not share them.</p>
+        <p>Best regards,<br>Attend Smart Team</p>
+        """
+    )
+
+    try:
+        sg = SendGridAPIClient(api_key=os.getenv('SENDGRID_API_KEY'))
+        response = sg.send(message)
+        print(f"Email sent to {teacher_email}: {response.status_code}")
+    except Exception as e:
+        print(f"Error sending email to {teacher_email}: {e}")
 
 def main(page: ft.Page):
     page.title = "Teacher Management - Face Recognition System"
@@ -232,6 +277,15 @@ def main(page: ft.Page):
                            (full_name.value, email.value, phone.value, username.value, password.value))
             conn.commit()
             conn.close()
+            # Send email notification
+            send_teacher_notification(
+                teacher_email=email.value.strip(),
+                teacher_name=full_name.value.strip(),
+                teacher_phone=phone.value.strip(),
+                username=username.value.strip(),
+                password=password.value.strip(),
+                action="added"
+            )
             reset_field_borders()
             show_alert_dialog("Success", "Teacher added successfully!", is_success=True)
             clear_form()
@@ -264,6 +318,15 @@ def main(page: ft.Page):
                                (full_name.value, email.value, phone.value, username.value, password.value, selected_id.current))
                 conn.commit()
                 conn.close()
+                # Send email notification
+                send_teacher_notification(
+                    teacher_email=email.value.strip(),
+                    teacher_name=full_name.value.strip(),
+                    teacher_phone=phone.value.strip(),
+                    username=username.value.strip(),
+                    password=password.value.strip(),
+                    action="updated"
+                )
                 reset_field_borders()
                 show_alert_dialog("Success", "Teacher updated successfully!", is_success=True)
                 clear_form()
@@ -338,7 +401,6 @@ def main(page: ft.Page):
         on_click=lambda e: [page.controls.clear(), show_main(page)]
     )
 
-    # Background with radial gradient
     background = ft.Container(
         content=ft.Stack([
             card,
@@ -354,9 +416,9 @@ def main(page: ft.Page):
             center=ft.Alignment(0, 0),
             radius=2.0,
             colors=[
-                ft.Colors.with_opacity(0.4, primary_color),
-                ft.Colors.with_opacity(0.2, accent_color),
-                ft.Colors.BLACK,
+                ft.colors.with_opacity(0.4, primary_color),
+                ft.colors.with_opacity(0.2, accent_color),
+                ft.colors.BLACK,
             ],
         ),
     )

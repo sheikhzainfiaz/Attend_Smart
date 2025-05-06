@@ -127,9 +127,10 @@ def main(page: ft.Page):
             to_emails=teacher_email,
             subject='Attend Smart: Successful Login Notification',
             html_content=f"""
-            <h2>Login Notification</h2>
+            <h2>Teacher Login Notification</h2>
             <p>Hello,<strong> {teacher_name} </strong></p>
             <p>You successfully logged in to Attend Smart - Facial Recognition Attendance System at <strong>{current_time}</strong>.</p>
+            <p>Best regards,<br>Attend Smart Team</p>
             """)
 
         try:

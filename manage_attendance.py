@@ -308,8 +308,8 @@ def main_manage(page: ft.Page, teacher_id=1):
                     subject=f'Attend Smart: Attendance Report for {course_name} on {selected_date.current}',
                     html_content=f"""
                     <h2>Attendance Report</h2>
-                    <p>Hello, {teacher_name}</p>
-                    <p>Attached is the attendance report for {course_name} on {selected_date.current}.</p>
+                    <p>Hello, <strong>{teacher_name}</strong></p>
+                    <p>Attached is the attendance report for <strong>{course_name} on {selected_date.current}</strong>.</p>
                     <p>Best regards,<br>Attend Smart Team</p>
                     """
                 )
