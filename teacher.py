@@ -21,7 +21,7 @@ def send_teacher_notification(teacher_email, teacher_name, teacher_phone, userna
         from_email='support@mzstyle.top',
         to_emails=teacher_email,
         subject=f'Attend Smart: Teacher {action.capitalize()} Notification',
-        html_content="""
+        html_content=f"""
         <h2>Teacher {action.capitalize()} Notification</h2>
         <p>Hello, <strong>{teacher_name}</strong></p>
         <p>Your details have been {action_text} the Attend Smart - Facial Recognition Attendance System at <strong>{current_time}</strong>.</p>
