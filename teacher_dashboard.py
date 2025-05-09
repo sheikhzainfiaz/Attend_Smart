@@ -69,7 +69,7 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
                 ft.TextButton("Yes", on_click=handle_confirm)
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.colors.WHITE
+            # bgcolor=ft.colors.WHITE
         )
 
         def close_dialog():

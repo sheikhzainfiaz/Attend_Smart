@@ -121,7 +121,7 @@ def main(page: ft.Page, teacher_id=1):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
+        # bgcolor=ft.colors.with_opacity(1, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.BOOK,
         text_style=ft.TextStyle(color=ft.colors.WHITE),

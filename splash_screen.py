@@ -4,20 +4,13 @@ import login  # Importing the login module (teacher management page)
 
 def main(page: ft.Page):
     # Configure the splash screen to match teacher management page styling
-    page.title = "Splash - Face Recognition System"
+    page.title = "Teacher Management - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.bgcolor = ft.colors.BLACK
     page.padding = 0
-    page.scroll = None
+    # page.scroll = ft.ScrollMode.AUTO
 
-    # Set window size using compatible properties
-    page.window.max_width = 800
-    page.window.max_height = 600
-    page.window.center()  # Center the window
-    page.window.resizable = False
-
-    # Theme colors from teacher management page
     primary_color = ft.colors.BLUE_600
     accent_color = ft.colors.CYAN_400
     card_bg = ft.LinearGradient(
@@ -25,6 +18,8 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
+
+   
 
     # Logo with animation (fade-in and scale)
     logo = ft.Image(

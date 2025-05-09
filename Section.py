@@ -36,7 +36,7 @@ def main(page: ft.Page):
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                bgcolor=ft.Colors.WHITE
+                # bgcolor=ft.Colors.WHITE
             )
 
             def close_dialog():
@@ -64,7 +64,7 @@ def main(page: ft.Page):
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.Colors.WHITE
+            # bgcolor=ft.Colors.WHITE
         )
 
         def close_dialog():
