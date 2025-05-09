@@ -16,7 +16,7 @@ CREATE TABLE teachers (
     Teacher_ID INT AUTO_INCREMENT PRIMARY KEY,
     Full_Name VARCHAR(100) NOT NULL,
     Email VARCHAR(100) UNIQUE NOT NULL,
-    Phone VARCHAR(20),
+    Phone VARCHAR(20) UNIQUE NOT NULL,
     Username VARCHAR(50) UNIQUE NOT NULL,
     Password VARCHAR(100) NOT NULL
 );
@@ -32,7 +32,7 @@ CREATE TABLE course (
 -- 5. Sections
 CREATE TABLE section (
     SectionID INT AUTO_INCREMENT PRIMARY KEY,
-    Name VARCHAR(10) NOT NULL,           -- e.g., SEA, SEB
+    Name VARCHAR(10) UNIQUE NOT NULL,           -- e.g., SEA, SEB
     Semester VARCHAR(10) NOT NULL,       -- e.g., 2nd, 5th
     Department VARCHAR(100) NOT NULL     -- e.g., Computer Science
 );
@@ -42,7 +42,7 @@ CREATE TABLE student (
     Roll_no VARCHAR(20) PRIMARY KEY,
     Full_Name VARCHAR(100) NOT NULL,
     SectionID INT NOT NULL,
-    PhotoSample VARCHAR(100),
+    PhotoSample VARCHAR(10),
     FOREIGN KEY (SectionID) REFERENCES section(SectionID) ON DELETE CASCADE
 );
 

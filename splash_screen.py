@@ -19,8 +19,6 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-   
-
     # Logo with animation (fade-in and scale)
     logo = ft.Image(
         src="assests\logo.png",  # Local image in assets folder

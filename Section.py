@@ -91,7 +91,7 @@ def main(page: ft.Page):
     )
     semester = ft.Dropdown(
         label="Semester",
-        hint_text="Select a semester",
+        hint_text="Select a Semester",
         options=[
             ft.dropdown.Option("1st"),
             ft.dropdown.Option("2nd"),
@@ -114,13 +114,24 @@ def main(page: ft.Page):
         hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
     )
-    department = ft.TextField(
+    department = ft.Dropdown(
         label="Department",
-        hint_text="Enter department (e.g., Computer Science)",
+        hint_text="Select a Department",
+        value = None,
+        options=[
+            ft.dropdown.Option("Department of Computer Science"),
+            ft.dropdown.Option("Department of Textile Engineering"),
+            ft.dropdown.Option("Department of Textile Technology"),
+            ft.dropdown.Option("Department of Materials"),
+            ft.dropdown.Option("Department of Applied Science"),
+            ft.dropdown.Option("Faisalabad Business School"),
+            ft.dropdown.Option("Department of Clothing"),
+            ft.dropdown.Option("School of Arts & Design"),
+        ],
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
-        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
+        filled=False,
+        bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.SCHOOL,
         text_style=ft.TextStyle(color=ft.Colors.WHITE),

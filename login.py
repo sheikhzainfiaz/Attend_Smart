@@ -86,7 +86,7 @@ def main(page: ft.Page):
         value=None,
         border_color=accent_color,
         focused_border_color=primary_color,
-        filled=True,
+        filled=False,
         # bgcolor=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
         border_radius=10,
         prefix_icon=ft.icons.GROUP,

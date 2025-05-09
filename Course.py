@@ -116,6 +116,7 @@ def main(page: ft.Page):
             ft.dropdown.Option("1"),
             ft.dropdown.Option("2"),
             ft.dropdown.Option("3"),
+            ft.dropdown.Option("4"),
         ],
         border_color=accent_color,
         focused_border_color=primary_color,
