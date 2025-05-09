@@ -35,7 +35,7 @@ def main(page: ft.Page):
             ),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.Colors.WHITE
+            
         )
 
         def close_dialog():
@@ -87,7 +87,7 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
+        # bgcolor=ft.Colors.with_opacity(0.25, ft.Colors.BLACK),
         border_radius=10,
         prefix_icon=ft.icons.GROUP,
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
