@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import face_recognition
 import logging
+import asyncio
 from back_button import create_back_button
 from Dash import show_main
 
@@ -19,7 +20,7 @@ def main(page: ft.Page):
 
     # Window settings
     page.title = "Face Recognition System - Train"
-    page.window_width = 1920  # Simulate maximized window
+    page.window_width = 1920
     page.window_height = 1080
     page.window_resizable = True
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
@@ -28,41 +29,64 @@ def main(page: ft.Page):
     page.padding = 0
     page.scroll = None
 
-    # Colors
-    primary_color = ft.Colors.BLUE_600
-    accent_color = ft.Colors.CYAN_400
+    # Colors and styles
+    primary_color = ft.colors.BLUE_500
+    accent_color = ft.colors.BLUE_800
     card_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
-        colors=[ft.Colors.BLUE_GREY_800, ft.Colors.BLUE_GREY_900]
+        colors=[ft.colors.GREY_900, ft.colors.BLUE_GREY_800]
     )
+
+    # Progress bar components
+    progress_bar = ft.ProgressBar(value=0, width=400, color=accent_color, bgcolor=ft.Colors.GREY_600, visible=False)
+    progress_text = ft.Text("Training: 0%", color=ft.Colors.WHITE, size=14, visible=False)
 
     def show_alert_dialog(title, message):
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text(title),
-            content=ft.Text(message),
-            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
-            actions_alignment=ft.MainAxisAlignment.END
+            title=ft.Text(title, color=ft.Colors.WHITE),
+            content=ft.Text(message, color=ft.Colors.WHITE),
+            actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(dialog))],
+            actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor=ft.Colors.BLUE_GREY_900,
         )
 
-        def close_dialog():
-            dialog.open = False
+        def close_dialog(dlg):
+            dlg.open = False
             page.update()
 
         page.overlay.append(dialog)
         dialog.open = True
         page.update()
 
-    # Train button functionality
-    def train_classifier(e):
-        """Encode all faces in the Images directory and save to a pickle file."""
-        if not os.path.exists(IMAGE_DIR):
-            show_alert_dialog("Error", f"Directory {IMAGE_DIR} does not exist.")
-            return
-
+    async def train_classifier_async():
+        """Encode all faces in the Images directory and save to a pickle file asynchronously."""
         encode_list = []
         student_ids = []
+
+        if not os.path.exists(IMAGE_DIR):
+            show_alert_dialog("Error", f"Directory {IMAGE_DIR} does not exist.")
+            progress_bar.visible = False
+            progress_text.visible = False
+            page.update()
+            return
+
+        # Count total images for progress calculation
+        total_images = 0
+        for student_folder in os.listdir(IMAGE_DIR):
+            folder_path = os.path.join(IMAGE_DIR, student_folder)
+            if os.path.isdir(folder_path):
+                total_images += len([f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))])
+
+        if total_images == 0:
+            show_alert_dialog("Error", "No images found in the directory.")
+            progress_bar.visible = False
+            progress_text.visible = False
+            page.update()
+            return
+
+        processed_images = 0
 
         for student_folder in os.listdir(IMAGE_DIR):
             folder_path = os.path.join(IMAGE_DIR, student_folder)
@@ -85,8 +109,19 @@ def main(page: ft.Page):
                 else:
                     show_alert_dialog("Error", f"No face found in {img_path}")
 
+                # Update progress
+                processed_images += 1
+                progress = processed_images / total_images
+                progress_bar.value = progress
+                progress_text.value = f"Training: {int(progress * 100)}%"
+                page.update()
+                await asyncio.sleep(0)  # Yield control to event loop
+
         if not encode_list:
             show_alert_dialog("Error", "No faces encoded.")
+            progress_bar.visible = False
+            progress_text.visible = False
+            page.update()
             return
 
         try:
@@ -95,68 +130,101 @@ def main(page: ft.Page):
             show_alert_dialog("Success", f"Encoding complete. Total faces encoded: {len(encode_list)}")
         except Exception as e:
             show_alert_dialog("Error", f"Failed to save encodings: {str(e)}")
+        finally:
+            progress_bar.visible = False
+            progress_text.visible = False
+            page.update()
 
-    # Train button
+    def train_classifier(e):
+        """Start the training process with a progress bar."""
+        progress_bar.visible = True
+        progress_text.visible = True
+        progress_bar.value = 0
+        progress_text.value = "Training: 0%"
+        page.update()
+
+        async def run_training():
+            await train_classifier_async()
+
+        asyncio.run_coroutine_threadsafe(run_training(), page.loop)
+
+    # Train button with spherical design and icon only
     train_button = ft.ElevatedButton(
-        text="Train",
+        content=ft.Icon(ft.icons.FACE_6, color=ft.Colors.WHITE, size=28),
         on_click=train_classifier,
         style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=12),
-            padding=ft.padding.symmetric(horizontal=20, vertical=15),
+            shape=ft.RoundedRectangleBorder(radius=50),
+            padding=ft.padding.all(20),
             bgcolor=primary_color,
             color=ft.Colors.WHITE,
-            elevation={"default": 5, "hovered": 8},
-            animation_duration=300,
-            text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            elevation={"default": 10, "hovered": 15},
+            animation_duration=400,
+            overlay_color=ft.Colors.with_opacity(0.25, ft.Colors.WHITE),
+            side=ft.BorderSide(2, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
+            shadow_color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
         ),
+        tooltip="Start training the face recognition model",
     )
 
-    # Card layout
+    # Card layout with integrated progress bar
     card = ft.Container(
         content=ft.Column(
             [
-                ft.Text(
-                    "Train Face Recognition Model",
-                    size=28,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.WHITE,
-                    text_align=ft.TextAlign.CENTER,
+                ft.Row(
+                    [
+                        ft.Icon(ft.icons.SCHOOL, color=accent_color, size=36),
+                        ft.Text(
+                            "Train Face Recognition Model",
+                            size=32,
+                            weight=ft.FontWeight.W_700,
+                            color=ft.Colors.WHITE,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=12,
                 ),
                 ft.Text(
-                    "Click the button below to encode student faces",
-                    size=16,
-                    color=ft.Colors.BLUE_200,
+                    "Encode student faces for recognition",
+                    size=18,
+                    color=ft.Colors.GREY_300,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                ft.Divider(height=40, color=ft.Colors.TRANSPARENT),
                 ft.Row(
                     [train_button],
                     alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=10,
+                ),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                ft.Row(
+                    [
+                        progress_bar,
+                        ft.Container(width=20),
+                        progress_text,
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
                 ),
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=15,
+            spacing=25,
         ),
-        padding=40,
-        width=800,
+        padding=60,
+        width=950,
         bgcolor=card_bg,
-        border_radius=20,
+        border_radius=28,
         shadow=ft.BoxShadow(
-            blur_radius=30,
-            spread_radius=5,
-            color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
+            blur_radius=50,
+            spread_radius=10,
+            color=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
         ),
-        animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
+        animate=ft.Animation(600, ft.AnimationCurve.EASE_OUT_CUBIC),
         scale=ft.transform.Scale(scale=1.0),
-        on_hover=lambda e: e.control.update(
-            scale=ft.transform.Scale(scale=1.02 if e.data == "true" else 1.0)
+        on_hover=lambda e: setattr(
+            e.control, "scale", ft.transform.Scale(scale=1.04 if e.data == "true" else 1.0)
         ),
     )
 
-    # Create back button for admin dashboard
+    # Create back button for admin dashboard (unchanged)
     back_btn = create_back_button(
         page,
         show_main,
@@ -171,18 +239,18 @@ def main(page: ft.Page):
             card,
             ft.Container(
                 content=back_btn,
-                top=10,
-                left=10,
+                top=20,
+                left=20,
             ),
         ]),
         alignment=ft.alignment.center,
         expand=True,
         gradient=ft.RadialGradient(
-            center=ft.Alignment(0, 0),
-            radius=2.0,
+            center=ft.Alignment(0, -0.5),
+            radius=1.5,
             colors=[
-                ft.Colors.with_opacity(0.4, primary_color),
-                ft.Colors.with_opacity(0.2, accent_color),
+                ft.Colors.with_opacity(0.6, primary_color),
+                ft.Colors.with_opacity(0.4, accent_color),
                 ft.Colors.BLACK,
             ],
         ),
