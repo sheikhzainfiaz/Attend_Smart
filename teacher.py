@@ -26,16 +26,13 @@ def send_teacher_notification(teacher_email, teacher_name, teacher_phone, userna
         <p>Your details have been {action_text} the Attend Smart - Facial Recognition Attendance System at <strong>{current_time}</strong>.</p>
         <p><strong>Your Details:</strong></p>
         <ul>
-        <p><strong>Your Key Credentials:</strong></p>
-        <ul>
-            <li>Username: {username}</li>
-            <li>Password: {password}</li>
-        </ul>
             <li>Name: {teacher_name}</li>
             <li>Email: {teacher_email}</li>
             <li>Phone: {teacher_phone}</li>
         </ul>
         
+        <p><strong>Your Key Credentials:</strong></p>
+        <ul>
             <li>Username: {username}</li>
             <li>Password: {password}</li>
         </ul>
