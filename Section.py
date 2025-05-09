@@ -1,6 +1,7 @@
 import flet as ft
 import mysql.connector
 import logging
+import re
 from back_button import create_back_button
 from Dash import show_main
 
@@ -10,16 +11,16 @@ def main(page: ft.Page):
     page.title = "Section Management - Face Recognition System"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.bgcolor = ft.Colors.BLACK
+    page.bgcolor = ft.colors.BLACK
     page.padding = 0
     page.scroll = ft.ScrollMode.AUTO
 
-    primary_color = ft.Colors.BLUE_600
-    accent_color = ft.Colors.CYAN_400
+    primary_color = ft.colors.BLUE_600
+    accent_color = ft.colors.CYAN_400
     card_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
-        colors=[ft.Colors.BLUE_GREY_800, ft.Colors.BLUE_GREY_900]
+        colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
     def show_alert_dialog(title, message, is_success=False, is_error=False):
@@ -30,13 +31,12 @@ def main(page: ft.Page):
                 title=ft.Text(title),
                 content=ft.Text(
                     message,
-                    color=ft.Colors.GREEN_600 if is_success else ft.Colors.RED_600 if is_error else ft.Colors.BLACK
+                    color=ft.colors.GREEN_600 if is_success else ft.colors.RED_600 if is_error else ft.colors.BLACK
                 ),
                 actions=[
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                # bgcolor=ft.Colors.WHITE
             )
 
             def close_dialog():
@@ -64,7 +64,6 @@ def main(page: ft.Page):
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            # bgcolor=ft.Colors.WHITE
         )
 
         def close_dialog():
@@ -81,13 +80,14 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.LABEL,
-        text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=720,
+        on_change=lambda e: validate_section_name(e.control.value)
     )
     semester = ft.Dropdown(
         label="Semester",
@@ -106,18 +106,17 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        # bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.CALENDAR_TODAY,
-        text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=720,
     )
     department = ft.Dropdown(
         label="Department",
         hint_text="Select a Department",
-        value = None,
+        value=None,
         options=[
             ft.dropdown.Option("Department of Computer Science"),
             ft.dropdown.Option("Department of Textile Engineering"),
@@ -131,12 +130,11 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        # bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.SCHOOL,
-        text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=720,
     )
 
@@ -146,30 +144,30 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
-        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.SEARCH,
-        text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        text_style=ft.TextStyle(color=ft.colors.WHITE),
+        label_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         on_change=lambda e: update_table(e.control.value.strip()),
         width=720,
     )
 
     data_table = ft.DataTable(
         border=ft.Border(
-            top=ft.BorderSide(1, ft.Colors.BLUE_200),
-            bottom=ft.BorderSide(1, ft.Colors.BLUE_200),
-            left=ft.BorderSide(1, ft.Colors.BLUE_200),
-            right=ft.BorderSide(1, ft.Colors.BLUE_200),
+            top=ft.BorderSide(1, ft.colors.BLUE_200),
+            bottom=ft.BorderSide(1, ft.colors.BLUE_200),
+            left=ft.BorderSide(1, ft.colors.BLUE_200),
+            right=ft.BorderSide(1, ft.colors.BLUE_200),
         ),
-        heading_row_color=ft.Colors.with_opacity(0.1, ft.Colors.BLUE_600),
-        heading_text_style=ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+        heading_row_color=ft.colors.with_opacity(0.1, ft.colors.BLUE_600),
+        heading_text_style=ft.TextStyle(color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
         columns=[
-            ft.DataColumn(ft.Text("Section ID", color=ft.Colors.WHITE)),
-            ft.DataColumn(ft.Text("Section Name", color=ft.Colors.WHITE)),
-            ft.DataColumn(ft.Text("Semester", color=ft.Colors.WHITE)),
-            ft.DataColumn(ft.Text("Department", color=ft.Colors.WHITE)),
+            ft.DataColumn(ft.Text("Section ID", color=ft.colors.WHITE)),
+            ft.DataColumn(ft.Text("Section Name", color=ft.colors.WHITE)),
+            ft.DataColumn(ft.Text("Semester", color=ft.colors.WHITE)),
+            ft.DataColumn(ft.Text("Department", color=ft.colors.WHITE)),
         ],
         rows=[]
     )
@@ -178,17 +176,67 @@ def main(page: ft.Page):
 
     def reset_field_borders():
         name.border_color = accent_color
+        name.error_text = None
         semester.border_color = accent_color
         department.border_color = accent_color
         page.update()
 
+    def validate_section_name(value):
+        section_pattern = r'^[A-Z0-9-]{2,10}$'
+        if value:
+            if not re.match(section_pattern, value):
+                name.border_color = ft.colors.RED_400
+                name.error_text = "Section name must be 2-10 characters, only uppercase letters, digits, or hyphens"
+                page.update()
+                return
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
+                if cursor.fetchone():
+                    name.border_color = ft.colors.RED_400
+                    name.error_text = "Section name already in use"
+                else:
+                    name.border_color = accent_color
+                    name.error_text = None
+                conn.close()
+            except mysql.connector.Error as err:
+                name.border_color = ft.colors.RED_400
+                name.error_text = "Error checking section name"
+                logging.error(f"Database error in validate_section_name: {err}")
+        else:
+            name.border_color = accent_color
+            name.error_text = None
+        page.update()
+
     def validate_fields(fields):
         reset_field_borders()
+        section_pattern = r'^[A-Z0-9-]{2,10}$'
         missing_fields = []
         for field, value in fields:
             if not value:
-                field.border_color = ft.Colors.RED_400
+                field.border_color = ft.colors.RED_400
                 missing_fields.append(field.label)
+            elif field == name:
+                if not re.match(section_pattern, value):
+                    field.border_color = ft.colors.RED_400
+                    field.error_text = "Section name must be 2-10 characters, only uppercase letters, digits, or hyphens"
+                    missing_fields.append(field.label)
+                else:
+                    try:
+                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
+                        if cursor.fetchone():
+                            field.border_color = ft.colors.RED_400
+                            field.error_text = "Section name already in use"
+                            missing_fields.append(field.label)
+                        conn.close()
+                    except mysql.connector.Error as err:
+                        field.border_color = ft.colors.RED_400
+                        field.error_text = "Error checking section name"
+                        missing_fields.append(field.label)
+                        logging.error(f"Database error in validate_fields: {err}")
         page.update()
         if len(missing_fields) == 1:
             return f"{missing_fields[0]} is required!"
@@ -199,7 +247,7 @@ def main(page: ft.Page):
     def clear_form():
         name.value = ""
         semester.value = None
-        department.value = ""
+        department.value = None
         search_field.value = ""
         selected_id.current = None
         reset_field_borders()
@@ -211,7 +259,6 @@ def main(page: ft.Page):
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
             if search_term:
-                # Search in both Name and Department for partial matches
                 query = "SELECT SectionID, Name, Semester, Department FROM section WHERE Name LIKE %s OR Department LIKE %s"
                 cursor.execute(query, (f"%{search_term}%", f"%{search_term}%"))
             else:
@@ -232,10 +279,10 @@ def main(page: ft.Page):
             data_table.rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(str(section_id), color=ft.Colors.WHITE)),
-                        ft.DataCell(ft.Text(sec_name, color=ft.Colors.WHITE)),
-                        ft.DataCell(ft.Text(sem, color=ft.Colors.WHITE)),
-                        ft.DataCell(ft.Text(dept, color=ft.Colors.WHITE)),
+                        ft.DataCell(ft.Text(str(section_id), color=ft.colors.WHITE)),
+                        ft.DataCell(ft.Text(sec_name, color=ft.colors.WHITE)),
+                        ft.DataCell(ft.Text(sem, color=ft.colors.WHITE)),
+                        ft.DataCell(ft.Text(dept, color=ft.colors.WHITE)),
                     ],
                     on_select_changed=lambda e, sid=section_id: select_section(sid)
                 )
@@ -265,9 +312,8 @@ def main(page: ft.Page):
         logging.debug("Add Section button clicked")
         section_name = name.value.strip() if name.value else ""
         sem = semester.value
-        dept = department.value.strip() if department.value else ""
+        dept = department.value
 
-        # Validate fields
         fields = [
             (name, section_name),
             (semester, sem),
@@ -305,9 +351,8 @@ def main(page: ft.Page):
 
         section_name = name.value.strip() if name.value else ""
         sem = semester.value
-        dept = department.value.strip() if department.value else ""
+        dept = department.value
 
-        # Validate fields
         fields = [
             (name, section_name),
             (semester, sem),
@@ -371,11 +416,11 @@ def main(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
             bgcolor=primary_color,
-            color=ft.Colors.WHITE,
+            color=ft.colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
         ),
     )
     update_btn = ft.ElevatedButton(
@@ -384,12 +429,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.Colors.AMBER_600,
-            color=ft.Colors.WHITE,
+            bgcolor=ft.colors.AMBER_600,
+            color=ft.colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
         ),
     )
     delete_btn = ft.ElevatedButton(
@@ -398,12 +443,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.Colors.RED_600,
-            color=ft.Colors.WHITE,
+            bgcolor=ft.colors.RED_600,
+            color=ft.colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
         ),
     )
     clear_btn = ft.ElevatedButton(
@@ -412,12 +457,12 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.Colors.GREY_600,
-            color=ft.Colors.WHITE,
+            bgcolor=ft.colors.GREY_600,
+            color=ft.colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
             text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            overlay_color=ft.colors.with_opacity(0.1, ft.colors.WHITE),
         ),
     )
 
@@ -428,7 +473,7 @@ def main(page: ft.Page):
             expand=True,
             alignment=ft.MainAxisAlignment.CENTER,
         ),
-        bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
+        bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
         padding=10,
         expand=True,
@@ -443,16 +488,16 @@ def main(page: ft.Page):
                     "Section Management",
                     size=28,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.WHITE,
+                    color=ft.colors.WHITE,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
                     "Add, update, or delete section records",
                     size=16,
-                    color=ft.Colors.BLUE_200,
+                    color=ft.colors.BLUE_200,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
                 ft.Column(
                     [
                         name,
@@ -466,7 +511,7 @@ def main(page: ft.Page):
                     ],
                     spacing=15,
                 ),
-                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
                 search_field,
                 data_table_container,
             ],
@@ -481,11 +526,10 @@ def main(page: ft.Page):
         shadow=ft.BoxShadow(
             blur_radius=30,
             spread_radius=5,
-            color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
+            color=ft.colors.with_opacity(0.3, ft.colors.BLACK),
         ),
     )
 
-    # Create back button for admin dashboard
     back_btn = create_back_button(
         page,
         show_main,
@@ -509,9 +553,9 @@ def main(page: ft.Page):
             center=ft.Alignment(0, -0.8),
             radius=1.5,
             colors=[
-                ft.Colors.with_opacity(0.2, primary_color),
-                ft.Colors.with_opacity(0.1, accent_color),
-                ft.Colors.BLACK,
+                ft.colors.with_opacity(0.2, primary_color),
+                ft.colors.with_opacity(0.1, accent_color),
+                ft.colors.BLACK,
             ],
         ),
     )
