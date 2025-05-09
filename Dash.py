@@ -67,7 +67,7 @@ def show_main(page: ft.Page):
         try:
             dialog = ft.AlertDialog(
                 modal=True,
-                title=ft.Text(title, style=ft.TextStyle(color=text_color)),
+                title=ft.Text(title),
                 content=ft.Text(
                     message,
                     color=ft.Colors.GREEN_600 if is_success else ft.Colors.RED_600 if is_error else ft.Colors.BLACK

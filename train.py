@@ -45,11 +45,11 @@ def main(page: ft.Page):
     def show_alert_dialog(title, message):
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text(title, color=ft.Colors.WHITE),
-            content=ft.Text(message, color=ft.Colors.WHITE),
+            title=ft.Text(title),
+            content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(dialog))],
             actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor=ft.Colors.BLUE_GREY_900,
+            # bgcolor=ft.Colors.BLUE_GREY_900,
         )
 
         def close_dialog(dlg):
