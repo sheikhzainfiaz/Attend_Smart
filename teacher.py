@@ -119,17 +119,38 @@ def main(page: ft.Page):
         )
         page.update()
 
+    # Add custom input filters before TextField definitions
+    class LettersAndSpacesInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[a-zA-Z\s]*$')
+
+    class EmailInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[a-zA-Z0-9._%+-@]*$')
+
+    class UsernameInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[a-zA-Z0-9_]*$')
+
+    class PasswordInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[a-zA-Z0-9@#$%!&*-_+?=]*$')
+
+    # Updated TextField definitions
     full_name = ft.TextField(
         label="Full Name",
         prefix_icon=ft.icons.PERSON,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         max_length=50,
+        input_filter=LettersAndSpacesInputFilter(),
         on_change=lambda e: validate_full_name(e.control.value)
     )
     email = ft.TextField(
         label="Email",
         prefix_icon=ft.icons.EMAIL,
+        max_length=30,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
+        input_filter=EmailInputFilter(),
         on_change=lambda e: validate_email(e.control.value)
     )
     phone = ft.TextField(
@@ -143,14 +164,18 @@ def main(page: ft.Page):
     username = ft.TextField(
         label="Username",
         prefix_icon=ft.icons.ACCOUNT_CIRCLE,
+        max_length=12,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
+        input_filter=UsernameInputFilter(),
         on_change=lambda e: validate_username(e.control.value)
     )
     password = ft.TextField(
         label="Password",
         prefix_icon=ft.icons.LOCK,
         password=True,
+        max_length=16,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
+        input_filter=PasswordInputFilter(),  # Restrict password input
         suffix=ft.IconButton(
             icon=ft.icons.VISIBILITY,
             on_click=toggle_password_visibility,
@@ -161,67 +186,106 @@ def main(page: ft.Page):
     )
 
     def validate_full_name(value):
-        name_pattern = r'^[a-zA-Z\s]*$'
-        if value and (not re.match(name_pattern, value) or len(value) > 50):
-            full_name.border_color = ft.colors.RED_400
-            full_name.error_text = "Name can only contain letters and spaces, max 50 characters"
-        else:
+        if not value:
             full_name.border_color = accent_color
+            full_name.error_text = None
+        elif len(value) < 4:
+            full_name.border_color = ft.colors.RED_400
+            full_name.error_text = "Full name must be at least 4 characters"
+        elif len(value) > 50:
+            full_name.border_color = ft.colors.RED_400
+            full_name.error_text = "Full name cannot exceed 50 characters"
+        else:
+            full_name.border_color = ft.colors.GREEN_600
             full_name.error_text = None
         page.update()
 
+    # Validation function for email
     def validate_email(value):
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if value and not re.match(email_pattern, value):
+        if not value:
+            email.border_color = accent_color
+            email.error_text = None
+        elif len(value) > 30:
+            email.border_color = ft.colors.RED_400
+            email.error_text = "Email cannot exceed 30 characters"
+        elif not re.match(email_pattern, value):
             email.border_color = ft.colors.RED_400
             email.error_text = "Invalid email format"
         else:
-            email.border_color = accent_color
+            email.border_color = ft.colors.GREEN_600
             email.error_text = None
         page.update()
 
+    # Validation function for phone
     def validate_phone(value):
-        if value and (not value.isdigit() or len(value) > 11):
-            phone.border_color = ft.colors.RED_400
-            phone.error_text = "Phone must be 11 digits only"
-        else:
+        if not value:
             phone.border_color = accent_color
+            phone.error_text = None
+        elif len(value) != 11:
+            phone.border_color = ft.colors.RED_400
+            phone.error_text = "Phone must be exactly 11 digits"
+        else:
+            phone.border_color = ft.colors.GREEN_600
             phone.error_text = None
         page.update()
 
+    # Validation function for username
     def validate_username(value):
         username_pattern = r'^[a-zA-Z0-9_]{4,12}$'
-        if value:
-            if not re.match(username_pattern, value):
-                username.border_color = ft.colors.RED_400
-                username.error_text = "Username must be 4-12 characters, only letters, digits, or underscore"
-                page.update()
-                return
-            try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
-                if cursor.fetchone():
-                    username.border_color = ft.colors.RED_400
-                    username.error_text = "Username already in use"
-                else:
-                    username.border_color = accent_color
-                    username.error_text = None
-                conn.close()
-            except Exception as e:
-                username.border_color = ft.colors.RED_400
-                username.error_text = "Error checking username"
-        else:
+        if not value:
             username.border_color = accent_color
             username.error_text = None
+            page.update()
+            return
+        if len(value) < 4:
+            username.border_color = ft.colors.RED_400
+            username.error_text = "Username must be at least 4 characters"
+            page.update()
+            return
+        if len(value) > 12:
+            username.border_color = ft.colors.RED_400
+            username.error_text = "Username cannot exceed 12 characters"
+            page.update()
+            return
+        if not re.match(username_pattern, value):
+            username.border_color = ft.colors.RED_400
+            username.error_text = "Username must be 4-12 characters, only letters, digits, or underscore"
+            page.update()
+            return
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
+            if cursor.fetchone():
+                username.border_color = ft.colors.RED_400
+                username.error_text = "Username already in use"
+            else:
+                username.border_color = ft.colors.GREEN_600
+                username.error_text = None
+            conn.close()
+        except Exception as e:
+            username.border_color = ft.colors.RED_400
+            username.error_text = "Error checking username"
         page.update()
 
+    # Validation function for password
     def validate_password(value):
-        if value and (len(value) < 7 or len(value) > 16):
-            password.border_color = ft.colors.RED_400
-            password.error_text = "Password must be 7-16 characters"
-        else:
+        password_pattern = r'^[a-zA-Z0-9@#$%]*$'
+        if not value:
             password.border_color = accent_color
+            password.error_text = None
+        elif len(value) < 7:
+            password.border_color = ft.colors.RED_400
+            password.error_text = "Password must be at least 7 characters"
+        elif len(value) > 16:
+            password.border_color = ft.colors.RED_400
+            password.error_text = "Password cannot exceed 16 characters"
+        elif not re.match(password_pattern, value):
+            password.border_color = ft.colors.RED_400
+            password.error_text = "Password can only contain letters, digits, and special characters"
+        else:
+            password.border_color = ft.colors.GREEN_600
             password.error_text = None
         page.update()
 
@@ -261,13 +325,13 @@ def main(page: ft.Page):
         reset_field_borders()
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         username_pattern = r'^[a-zA-Z0-9_]{4,12}$'
-        name_pattern = r'^[a-zA-Z\s]*$'
+        password_pattern = r'^[a-zA-Z0-9@#$%]*$'
         missing_fields = []
         for field, value in fields:
             if not value:
                 field.border_color = ft.colors.RED_400
                 missing_fields.append(field.label)
-            elif field == phone and (not value.isdigit() or len(value) != 11):
+            elif field == phone and len(value) != 11:
                 field.border_color = ft.colors.RED_400
                 field.error_text = "Phone must be 11 digits"
                 missing_fields.append(field.label)
@@ -294,13 +358,18 @@ def main(page: ft.Page):
                         field.border_color = ft.colors.RED_400
                         field.error_text = "Error checking username"
                         missing_fields.append(field.label)
-            elif field == password and (len(value) < 7 or len(value) > 16):
+            elif field == password:
+                if not re.match(password_pattern, value):
+                    field.border_color = ft.colors.RED_400
+                    field.error_text = "Password can only contain letters, digits, and @#$%"
+                    missing_fields.append(field.label)
+                elif len(value) < 7 or len(value) > 16:
+                    field.border_color = ft.colors.RED_400
+                    field.error_text = "Password must be 7-16 characters"
+                    missing_fields.append(field.label)
+            elif field == full_name and len(value) > 50:
                 field.border_color = ft.colors.RED_400
-                field.error_text = "Password must be 7-16 characters"
-                missing_fields.append(field.label)
-            elif field == full_name and (not re.match(name_pattern, value) or len(value) > 50):
-                field.border_color = ft.colors.RED_400
-                field.error_text = "Name can only contain letters and spaces, max 50 characters"
+                field.error_text = "Name cannot exceed 50 characters"
                 missing_fields.append(field.label)
         page.update()
         if len(missing_fields) == 1:
