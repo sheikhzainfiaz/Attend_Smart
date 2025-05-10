@@ -4,6 +4,7 @@ import logging
 import cv2
 import os
 import re
+from datetime import datetime
 from back_button import create_back_button
 from Dash import show_main
 
@@ -58,38 +59,43 @@ def get_department_by_section(section_id):
         cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
         department = cursor.fetchone()
         conn.close()
-        return department[0] if department else None
+        return department[0].strip() if department else None
     except mysql.connector.Error as err:
         logging.error(f"Database error fetching department: {err}")
         return None
 
-# Function to validate roll number format
-def validate_roll_number(roll_no, department):
+# Function to get department code from department name
+def get_dept_code(department):
+    for dept, codes in DEPARTMENT_CODES.items():
+        if dept == department:
+            return codes[0]  # Return the first valid code
+    return None
+
+# Function to validate and modify roll number
+def validate_and_modify_roll_number(roll_no, department):
     if not roll_no or not department:
-        return False, "Roll number and section are required!"
-    
-    # Expected format: YY-NTU-DD-NNNN
-    pattern = r"^\d{2}-NTU-[A-Z]{2}-\d{4}$"
-    if not re.match(pattern, roll_no):
-        return False, "Invalid roll number format! Use YY-NTU-DD-NNNN (e.g., 23-NTU-CS-1200)"
+        return "", "Roll number and section are required!"
 
-    # Extract department code
-    dept_code = roll_no.split('-')[2]
-    valid_codes = DEPARTMENT_CODES.get(department, [])
-    if dept_code not in valid_codes:
-        return False, f"Invalid department code '{dept_code}' for {department}!"
+    # Extract components if they exist
+    parts = roll_no.split('-')
+    current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
+    default_dept_code = get_dept_code(department)
 
-    # Validate year (e.g., 20-25 for 2020-2025)
-    year = int(roll_no[:2])
-    if not (20 <= year <= 25):
-        return False, "Invalid year in roll number! Use 20-25."
-
-    # Validate number part
-    number = roll_no[-4:]
-    if not number.isdigit():
-        return False, "Last 4 characters must be digits!"
-
-    return True, ""
+    if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:  # Only 4 digits (e.g., 1200)
+        return f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}", ""
+    elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:  # YY-XXXX (e.g., 23-1200)
+        return f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}", ""
+    elif len(parts) == 4:  # Full format (e.g., YY-NTU-DD-NNNN)
+        year, _, dept_code, number = parts
+        if not year.isdigit() or len(year) != 2 or not number.isdigit() or len(number) != 4:
+            return "", "Invalid year or number format!"
+        if not (20 <= int(year) <= 25):
+            return "", "Invalid year in roll number! Use 20-25."
+        if dept_code != default_dept_code:
+            return f"{year}-NTU-{default_dept_code}-{number}", f"Updated department code to {default_dept_code} for {department}!"
+        return roll_no, ""
+    else:
+        return "", "Invalid roll number format! Use YY-NTU-DD-NNNN, YY-XXXX, or XXXX."
 
 # Function to validate full name
 def validate_full_name(name):
@@ -119,7 +125,7 @@ def main(page: ft.Page):
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
 
-    # AlertDialog function (unchanged)
+    # AlertDialog function
     def show_alert_dialog(title, message, is_success=False, is_error=False):
         dialog = ft.AlertDialog(
             modal=True,
@@ -140,7 +146,7 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Confirm dialog function (unchanged)
+    # Confirm dialog function
     def show_confirm_dialog(title, message, on_confirm):
         dialog = ft.AlertDialog(
             modal=True,
@@ -161,7 +167,7 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Function to capture photos (unchanged)
+    # Function to capture photos
     def take_photo_and_save(roll_number):
         if not roll_number:
             show_alert_dialog("Error", "Roll Number is required!", is_error=True)
@@ -216,7 +222,7 @@ def main(page: ft.Page):
     # Form fields
     roll_no = ft.TextField(
         label="Roll Number",
-        hint_text="e.g., 23-NTU-CS-1200",
+        hint_text="e.g., 24-NTU-CS-1200, 24-1200, or 1200",
         autofocus=True,
         border_color=accent_color,
         focused_border_color=primary_color,
@@ -247,6 +253,49 @@ def main(page: ft.Page):
     sections = get_sections_from_db()
 
     # Dropdown for section_id
+    def generate_roll_number(section_id):
+        if not section_id:
+            roll_no.value = ""
+            roll_no.error_text = None
+            roll_no.update()
+            return
+
+        # Get the department for the selected section
+        department = get_department_by_section(section_id)
+        if not department:
+            roll_no.value = ""
+            roll_no.error_text = "Unable to fetch department for selected section!"
+            roll_no.update()
+            return
+
+        # Get the current year (last two digits)
+        current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
+        default_dept_code = get_dept_code(department)
+
+        # Validate and modify the existing roll number
+        new_roll, message = validate_and_modify_roll_number(roll_no.value, department)
+        if new_roll:
+            roll_no.value = new_roll
+            if message:
+                roll_no.error_text = message
+            else:
+                roll_no.error_text = None
+        else:
+            # If invalid, generate a new roll number with default values
+            parts = roll_no.value.split('-')
+            if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:  # Only 4 digits
+                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}"
+                roll_no.error_text = None
+            elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:  # YY-XXXX
+                roll_no.value = f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}"
+                roll_no.error_text = None
+            else:  # Full or invalid format
+                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-0001"
+                roll_no.error_text = "Roll number updated to default format!"
+
+        logging.debug(f"Generated/Modified roll number: {roll_no.value} for department: {department}")
+        roll_no.update()
+
     section_id = ft.Dropdown(
         label="Section",
         hint_text="Select a section",
@@ -265,7 +314,7 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=750,
-        on_change=lambda e: validate_roll_no_live(roll_no.value.strip()),
+        on_change=lambda e: generate_roll_number(e.control.value),
     )
 
     photo_sample = ft.Dropdown(
@@ -292,7 +341,7 @@ def main(page: ft.Page):
         width=750,
     )
 
-    # Search field (unchanged)
+    # Search field
     search_field = ft.TextField(
         label="Search Students",
         hint_text="Search by name or roll number",
@@ -308,7 +357,7 @@ def main(page: ft.Page):
         on_change=lambda e: update_table(e.control.value.strip()),
     )
 
-    # DataTable (unchanged)
+    # DataTable
     data_table = ft.DataTable(
         border=ft.Border(
             top=ft.BorderSide(1, ft.colors.BLUE_200),
@@ -335,6 +384,7 @@ def main(page: ft.Page):
         full_name.border_color = accent_color
         section_id.border_color = accent_color
         photo_sample.border_color = accent_color
+        roll_no.error_text = None
         page.update()
 
     # Helper function to validate fields
@@ -347,7 +397,7 @@ def main(page: ft.Page):
                 errors.append(f"{label} is required!")
             elif field == roll_no and check_roll_no:
                 department = get_department_by_section(section_id.value)
-                is_valid, error = validate_roll_number(value, department)
+                is_valid, error = validate_and_modify_roll_number(value, department)
                 if not is_valid:
                     field.border_color = ft.colors.RED_400
                     errors.append(error)
@@ -364,10 +414,17 @@ def main(page: ft.Page):
         reset_field_borders()
         if roll and section_id.value:
             department = get_department_by_section(section_id.value)
-            is_valid, error = validate_roll_number(roll, department)
-            if not is_valid:
+            logging.debug(f"Validating roll {roll} against department: {department}")
+            new_roll, message = validate_and_modify_roll_number(roll, department)
+            if new_roll and new_roll != roll:
+                roll_no.value = new_roll
+                if message:
+                    roll_no.error_text = message
+                else:
+                    roll_no.error_text = None
+            elif not new_roll:
                 roll_no.border_color = ft.colors.RED_400
-                roll_no.error_text = error
+                roll_no.error_text = message or "Invalid roll number format!"
             else:
                 roll_no.error_text = None
         else:
@@ -574,7 +631,7 @@ def main(page: ft.Page):
         logging.debug("Take Photo button clicked")
         roll = roll_no.value.strip() if roll_no.value else ""
         department = get_department_by_section(section_id.value)
-        is_valid, error = validate_roll_number(roll, department)
+        is_valid, error = validate_and_modify_roll_number(roll, department)
         if not roll or not is_valid:
             show_alert_dialog("Validation Error", error or "Roll Number is required!", is_error=True)
             logging.warning("Take photo failed: Invalid roll number")
@@ -601,7 +658,7 @@ def main(page: ft.Page):
         photo_sample.update()
         page.update()
 
-    # Buttons (unchanged)
+    # Buttons
     add_btn = ft.ElevatedButton(
         text="Add Student",
         on_click=add_click,
@@ -684,7 +741,7 @@ def main(page: ft.Page):
     logging.debug("Loading initial table data")
     update_table()
 
-    # Card container (unchanged)
+    # Card container
     card = ft.Container(
         content=ft.Column(
             [
@@ -744,7 +801,7 @@ def main(page: ft.Page):
         ),
     )
 
-    # Create back button for admin dashboard (unchanged)
+    # Create back button for admin dashboard
     back_btn = create_back_button(
         page,
         show_main,
@@ -753,7 +810,7 @@ def main(page: ft.Page):
         on_click=lambda e: [page.controls.clear(), show_main(page)]
     )
 
-    # Background with radial gradient (unchanged)
+    # Background with radial gradient
     background = ft.Container(
         content=ft.Stack([
             card,
