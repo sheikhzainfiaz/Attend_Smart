@@ -37,6 +37,15 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.GREY_900, ft.colors.BLUE_GREY_800]
     )
+    # logo = ft.Image(
+    #     src=os.path.join("assets", "logo.png"),  # Local image in assets folder
+    #     width=100,
+    #     height=100,
+    #     fit=ft.ImageFit.CONTAIN,
+    #     opacity=0,  # Start invisible for fade-in
+    #     animate_opacity=ft.Animation(duration=1000, curve=ft.AnimationCurve.EASE_IN_OUT),
+    #     animate_scale=ft.Animation(duration=1000, curve=ft.AnimationCurve.EASE_IN_OUT),
+    # )
 
     # Progress bar components
     progress_bar = ft.ProgressBar(value=0, width=400, color=accent_color, bgcolor=ft.Colors.GREY_600, visible=False)
@@ -49,7 +58,6 @@ def main(page: ft.Page):
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(dialog))],
             actions_alignment=ft.MainAxisAlignment.END,
-            # bgcolor=ft.Colors.BLUE_GREY_900,
         )
 
         def close_dialog(dlg):
@@ -148,21 +156,35 @@ def main(page: ft.Page):
 
         asyncio.run_coroutine_threadsafe(run_training(), page.loop)
 
-    # Train button with spherical design and icon only
+    # Updated Train button: Larger, square, dashboard-style
     train_button = ft.ElevatedButton(
-        content=ft.Icon(ft.icons.FACE_6, color=ft.Colors.WHITE, size=28),
+        content=ft.Row(
+            [
+                ft.Icon(ft.icons.FACE_6, color=ft.Colors.WHITE, size=36),
+                ft.Text(
+                    "Train Model",
+                    color=ft.Colors.WHITE,
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10,
+        ),
         on_click=train_classifier,
         style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=50),
-            padding=ft.padding.all(20),
+            shape=ft.RoundedRectangleBorder(radius=12),  # Square with slight rounding
+            padding=ft.padding.symmetric(horizontal=30, vertical=20),
             bgcolor=primary_color,
             color=ft.Colors.WHITE,
-            elevation={"default": 10, "hovered": 15},
-            animation_duration=400,
-            overlay_color=ft.Colors.with_opacity(0.25, ft.Colors.WHITE),
-            side=ft.BorderSide(2, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
-            shadow_color=ft.Colors.with_opacity(0.3, ft.Colors.BLACK),
+            elevation={"default": 8, "hovered": 12},
+            animation_duration=300,
+            overlay_color=ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
+            side=ft.BorderSide(1, ft.Colors.with_opacity(0.3, ft.Colors.WHITE)),
+            shadow_color=ft.Colors.with_opacity(0.4, ft.Colors.BLACK),
         ),
+        width=250,  # Larger width
+        height=80,  # Larger height
         tooltip="Start training the face recognition model",
     )
 
@@ -170,8 +192,10 @@ def main(page: ft.Page):
     card = ft.Container(
         content=ft.Column(
             [
+                # logo,
                 ft.Row(
                     [
+                        
                         ft.Icon(ft.icons.SCHOOL, color=accent_color, size=36),
                         ft.Text(
                             "Train Face Recognition Model",
