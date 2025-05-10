@@ -243,6 +243,7 @@ def main(page: ft.Page):
         filled=True,
         bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
+        # input_filter=ft.TextOnlyInputFilter(),
         prefix_icon=ft.icons.PERSON_OUTLINE,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
