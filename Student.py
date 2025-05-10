@@ -3,12 +3,24 @@ import mysql.connector
 import logging
 import cv2
 import os
+import re
 from back_button import create_back_button
 from Dash import show_main
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
+# Department code mapping
+DEPARTMENT_CODES = {
+    "Department of Computer Science": ["CS"],
+    "Department of Textile Engineering": ["TE"],
+    "Department of Textile Technology": ["TT"],
+    "Department of Materials": ["PE"],
+    "Department of Applied Science": ["CH", "PH", "MM"],
+    "Faisalabad Business School": ["BA"],
+    "Department of Clothing": ["AM"],
+    "School of Arts & Design": ["DD"]
+}
 
 # Function to fetch sections from the MySQL database
 def get_sections_from_db():
@@ -21,14 +33,73 @@ def get_sections_from_db():
             port=3306
         )
         cursor = conn.cursor()
-        cursor.execute("SELECT SectionID, Name FROM section")
-        sections = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+        cursor.execute("SELECT SectionID, Name, Department FROM section")
+        sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
         conn.close()
         logging.debug(f"Fetched {len(sections)} sections: {sections}")
         return sections
     except mysql.connector.Error as err:
         logging.error(f"Database error fetching sections: {err}")
         return []
+
+# Function to get department by SectionID
+def get_department_by_section(section_id):
+    if not section_id:
+        return None
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="face_db",
+            port=3306
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
+        department = cursor.fetchone()
+        conn.close()
+        return department[0] if department else None
+    except mysql.connector.Error as err:
+        logging.error(f"Database error fetching department: {err}")
+        return None
+
+# Function to validate roll number format
+def validate_roll_number(roll_no, department):
+    if not roll_no or not department:
+        return False, "Roll number and section are required!"
+    
+    # Expected format: YY-NTU-DD-NNNN
+    pattern = r"^\d{2}-NTU-[A-Z]{2}-\d{4}$"
+    if not re.match(pattern, roll_no):
+        return False, "Invalid roll number format! Use YY-NTU-DD-NNNN (e.g., 23-NTU-CS-1200)"
+
+    # Extract department code
+    dept_code = roll_no.split('-')[2]
+    valid_codes = DEPARTMENT_CODES.get(department, [])
+    if dept_code not in valid_codes:
+        return False, f"Invalid department code '{dept_code}' for {department}!"
+
+    # Validate year (e.g., 20-25 for 2020-2025)
+    year = int(roll_no[:2])
+    if not (20 <= year <= 25):
+        return False, "Invalid year in roll number! Use 20-25."
+
+    # Validate number part
+    number = roll_no[-4:]
+    if not number.isdigit():
+        return False, "Last 4 characters must be digits!"
+
+    return True, ""
+
+# Function to validate full name
+def validate_full_name(name):
+    if not name:
+        return False, "Full name is required!"
+    if len(name) < 2 or len(name) > 50:
+        return False, "Full name must be between 2 and 50 characters!"
+    if not re.match(r"^[A-Za-z\s]+$", name):
+        return False, "Full name can only contain letters and spaces!"
+    return True, ""
 
 def main(page: ft.Page):
     logging.debug("Starting student management page")
@@ -46,11 +117,9 @@ def main(page: ft.Page):
         begin=ft.Alignment(-1, -1),
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
-    
     )
-    
 
-    # AlertDialog function
+    # AlertDialog function (unchanged)
     def show_alert_dialog(title, message, is_success=False, is_error=False):
         dialog = ft.AlertDialog(
             modal=True,
@@ -61,7 +130,6 @@ def main(page: ft.Page):
             ),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog())],
             actions_alignment=ft.MainAxisAlignment.END,
-            # bgcolor=ft.colors.WHITE
         )
 
         def close_dialog():
@@ -72,7 +140,7 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Confirm dialog function
+    # Confirm dialog function (unchanged)
     def show_confirm_dialog(title, message, on_confirm):
         dialog = ft.AlertDialog(
             modal=True,
@@ -83,7 +151,6 @@ def main(page: ft.Page):
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            # bgcolor=ft.colors.WHITE
         )
 
         def close_dialog():
@@ -94,9 +161,8 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Function to capture photos
+    # Function to capture photos (unchanged)
     def take_photo_and_save(roll_number):
-        """Capture up to 5 photos and overwrite in a loop using the roll_number as folder."""
         if not roll_number:
             show_alert_dialog("Error", "Roll Number is required!", is_error=True)
             return None
@@ -123,30 +189,25 @@ def main(page: ft.Page):
             cv2.imshow("Take Photo", img)
             key = cv2.waitKey(1) & 0xFF
 
-            if key == ord('s'):  # Capture on 's'
-                # Make the image square
+            if key == ord('s'):
                 height, width, _ = img.shape
                 square_size = min(height, width)
                 x = (width - square_size) // 2
                 y = (height - square_size) // 2
                 square_img = img[y:y + square_size, x:x + square_size]
-
-                # Resize to standard
                 square_img = cv2.resize(square_img, (224, 224))
-
-                # Save image with overwrite logic
                 filename = os.path.join(save_path, f"{roll_number}_{count}.jpg")
                 cv2.imwrite(filename, square_img)
                 logging.debug(f"Saved {filename}")
                 count += 1
 
-            elif key == ord('q'):  # Quit on 'q'
+            elif key == ord('q'):
                 break
 
         cap.release()
         cv2.destroyAllWindows()
 
-        if count > 1:  # At least one photo was saved
+        if count > 1:
             return filename
         else:
             show_alert_dialog("Warning", "No photos were saved!", is_error=True)
@@ -155,7 +216,7 @@ def main(page: ft.Page):
     # Form fields
     roll_no = ft.TextField(
         label="Roll Number",
-        hint_text="Enter student roll number",
+        hint_text="e.g., 23-NTU-CS-1200",
         autofocus=True,
         border_color=accent_color,
         focused_border_color=primary_color,
@@ -166,6 +227,7 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        on_change=lambda e: validate_roll_no_live(e.control.value.strip()),
     )
     full_name = ft.TextField(
         label="Full Name",
@@ -203,6 +265,7 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=750,
+        on_change=lambda e: validate_roll_no_live(roll_no.value.strip()),
     )
 
     photo_sample = ft.Dropdown(
@@ -229,7 +292,7 @@ def main(page: ft.Page):
         width=750,
     )
 
-    # Search field
+    # Search field (unchanged)
     search_field = ft.TextField(
         label="Search Students",
         hint_text="Search by name or roll number",
@@ -245,7 +308,7 @@ def main(page: ft.Page):
         on_change=lambda e: update_table(e.control.value.strip()),
     )
 
-    # DataTable
+    # DataTable (unchanged)
     data_table = ft.DataTable(
         border=ft.Border(
             top=ft.BorderSide(1, ft.colors.BLUE_200),
@@ -274,20 +337,42 @@ def main(page: ft.Page):
         photo_sample.border_color = accent_color
         page.update()
 
-    # Helper function to highlight empty fields and get error message
-    def validate_fields(fields):
+    # Helper function to validate fields
+    def validate_fields(fields, check_roll_no=True, check_name=True):
         reset_field_borders()
-        missing_fields = []
-        for field, value in fields:
+        errors = []
+        for field, value, label in fields:
             if not value:
                 field.border_color = ft.colors.RED_400
-                missing_fields.append(field.label)
+                errors.append(f"{label} is required!")
+            elif field == roll_no and check_roll_no:
+                department = get_department_by_section(section_id.value)
+                is_valid, error = validate_roll_number(value, department)
+                if not is_valid:
+                    field.border_color = ft.colors.RED_400
+                    errors.append(error)
+            elif field == full_name and check_name:
+                is_valid, error = validate_full_name(value)
+                if not is_valid:
+                    field.border_color = ft.colors.RED_400
+                    errors.append(error)
         page.update()
-        if len(missing_fields) == 1:
-            return f"{missing_fields[0]} is required!"
-        elif missing_fields:
-            return f"The following fields are required: {', '.join(missing_fields)}"
-        return None
+        return errors
+
+    # Live validation for roll number
+    def validate_roll_no_live(roll):
+        reset_field_borders()
+        if roll and section_id.value:
+            department = get_department_by_section(section_id.value)
+            is_valid, error = validate_roll_number(roll, department)
+            if not is_valid:
+                roll_no.border_color = ft.colors.RED_400
+                roll_no.error_text = error
+            else:
+                roll_no.error_text = None
+        else:
+            roll_no.error_text = None
+        page.update()
 
     def fetch_students(search_term=""):
         logging.debug(f"Fetching students with search term: {search_term}")
@@ -357,6 +442,7 @@ def main(page: ft.Page):
                 photo_sample.value = student[3] if student[3] else None
                 logging.debug(f"Selected student - Section: {section_id.value}, Photo Sample: {photo_sample.value}")
             reset_field_borders()
+            roll_no.error_text = None
             page.update()
         except mysql.connector.Error as err:
             show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
@@ -370,15 +456,15 @@ def main(page: ft.Page):
 
         # Validate all fields
         fields = [
-            (roll_no, roll),
-            (full_name, name),
-            (section_id, section),
-            (photo_sample, photo)
+            (roll_no, roll, "Roll Number"),
+            (full_name, name, "Full Name"),
+            (section_id, section, "Section"),
+            (photo_sample, photo, "Photo Sample")
         ]
-        error_message = validate_fields(fields)
-        if error_message:
-            logging.warning(f"Add failed: {error_message}")
-            show_alert_dialog("Validation Error", error_message, is_error=True)
+        errors = validate_fields(fields)
+        if errors:
+            logging.warning(f"Add failed: {'; '.join(errors)}")
+            show_alert_dialog("Validation Error", "\n".join(errors), is_error=True)
             return
 
         try:
@@ -417,17 +503,18 @@ def main(page: ft.Page):
         section = section_id.value
         photo = photo_sample.value
 
-        # Validate all fields
+        # Validate all fields (skip roll number format validation if unchanged)
+        check_roll_no = roll != selected_roll_no.current
         fields = [
-            (roll_no, roll),
-            (full_name, name),
-            (section_id, section),
-            (photo_sample, photo)
+            (roll_no, roll, "Roll Number"),
+            (full_name, name, "Full Name"),
+            (section_id, section, "Section"),
+            (photo_sample, photo, "Photo Sample")
         ]
-        error_message = validate_fields(fields)
-        if error_message:
-            logging.warning(f"Update failed: {error_message}")
-            show_alert_dialog("Validation Error", error_message, is_error=True)
+        errors = validate_fields(fields, check_roll_no=check_roll_no)
+        if errors:
+            logging.warning(f"Update failed: {'; '.join(errors)}")
+            show_alert_dialog("Validation Error", "\n".join(errors), is_error=True)
             return
 
         def confirm_update():
@@ -486,9 +573,11 @@ def main(page: ft.Page):
     def take_photo_click(e):
         logging.debug("Take Photo button clicked")
         roll = roll_no.value.strip() if roll_no.value else ""
-        if not roll:
-            show_alert_dialog("Validation Error", "Roll Number is required!", is_error=True)
-            logging.warning("Take photo failed: No roll number provided")
+        department = get_department_by_section(section_id.value)
+        is_valid, error = validate_roll_number(roll, department)
+        if not roll or not is_valid:
+            show_alert_dialog("Validation Error", error or "Roll Number is required!", is_error=True)
+            logging.warning("Take photo failed: Invalid roll number")
             return
 
         filename = take_photo_and_save(roll)
@@ -505,13 +594,14 @@ def main(page: ft.Page):
         photo_sample.value = None
         selected_roll_no.current = None
         search_field.value = ""
+        roll_no.error_text = None
         reset_field_borders()
         logging.debug(f"Form cleared - Section: {section_id.value}, Photo Sample: {photo_sample.value}")
         section_id.update()
         photo_sample.update()
         page.update()
 
-    # Buttons
+    # Buttons (unchanged)
     add_btn = ft.ElevatedButton(
         text="Add Student",
         on_click=add_click,
@@ -594,7 +684,7 @@ def main(page: ft.Page):
     logging.debug("Loading initial table data")
     update_table()
 
-    # Card container
+    # Card container (unchanged)
     card = ft.Container(
         content=ft.Column(
             [
@@ -654,7 +744,7 @@ def main(page: ft.Page):
         ),
     )
 
-    # Create back button for admin dashboard
+    # Create back button for admin dashboard (unchanged)
     back_btn = create_back_button(
         page,
         show_main,
@@ -663,7 +753,7 @@ def main(page: ft.Page):
         on_click=lambda e: [page.controls.clear(), show_main(page)]
     )
 
-    # Background with radial gradient
+    # Background with radial gradient (unchanged)
     background = ft.Container(
         content=ft.Stack([
             card,
@@ -679,16 +769,15 @@ def main(page: ft.Page):
             center=ft.Alignment(0, 0),
             radius=2.0,
             colors=[
-                ft.Colors.with_opacity(0.4, primary_color),
-                ft.Colors.with_opacity(0.2, accent_color),
-                ft.Colors.BLACK,
+                ft.colors.with_opacity(0.4, primary_color),
+                ft.colors.with_opacity(0.2, accent_color),
+                ft.colors.BLACK,
             ],
         ),
     )
 
     page.add(background)
     update_table()
-
 
 if __name__ == "__main__":
     logging.debug("Running Flet app")
