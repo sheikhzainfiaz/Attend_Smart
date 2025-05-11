@@ -192,9 +192,6 @@ def main(page: ft.Page):
         elif len(value) < 4:
             full_name.border_color = ft.colors.RED_400
             full_name.error_text = "Full name must be at least 4 characters"
-        elif len(value) > 50:
-            full_name.border_color = ft.colors.RED_400
-            full_name.error_text = "Full name cannot exceed 50 characters"
         else:
             full_name.border_color = ft.colors.GREEN_600
             full_name.error_text = None
@@ -206,9 +203,6 @@ def main(page: ft.Page):
         if not value:
             email.border_color = accent_color
             email.error_text = None
-        elif len(value) > 30:
-            email.border_color = ft.colors.RED_400
-            email.error_text = "Email cannot exceed 30 characters"
         elif not re.match(email_pattern, value):
             email.border_color = ft.colors.RED_400
             email.error_text = "Invalid email format"
@@ -232,7 +226,6 @@ def main(page: ft.Page):
 
     # Validation function for username
     def validate_username(value):
-        username_pattern = r'^[a-zA-Z0-9_]{4,12}$'
         if not value:
             username.border_color = accent_color
             username.error_text = None
@@ -241,16 +234,6 @@ def main(page: ft.Page):
         if len(value) < 4:
             username.border_color = ft.colors.RED_400
             username.error_text = "Username must be at least 4 characters"
-            page.update()
-            return
-        if len(value) > 12:
-            username.border_color = ft.colors.RED_400
-            username.error_text = "Username cannot exceed 12 characters"
-            page.update()
-            return
-        if not re.match(username_pattern, value):
-            username.border_color = ft.colors.RED_400
-            username.error_text = "Username must be 4-12 characters, only letters, digits, or underscore"
             page.update()
             return
         try:
@@ -271,19 +254,12 @@ def main(page: ft.Page):
 
     # Validation function for password
     def validate_password(value):
-        password_pattern = r'^[a-zA-Z0-9@#$%]*$'
         if not value:
             password.border_color = accent_color
             password.error_text = None
         elif len(value) < 7:
             password.border_color = ft.colors.RED_400
             password.error_text = "Password must be at least 7 characters"
-        elif len(value) > 16:
-            password.border_color = ft.colors.RED_400
-            password.error_text = "Password cannot exceed 16 characters"
-        elif not re.match(password_pattern, value):
-            password.border_color = ft.colors.RED_400
-            password.error_text = "Password can only contain letters, digits, and special characters"
         else:
             password.border_color = ft.colors.GREEN_600
             password.error_text = None
@@ -324,8 +300,6 @@ def main(page: ft.Page):
     def validate_fields(fields):
         reset_field_borders()
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        username_pattern = r'^[a-zA-Z0-9_]{4,12}$'
-        password_pattern = r'^[a-zA-Z0-9@#$%]*$'
         missing_fields = []
         for field, value in fields:
             if not value:
@@ -340,9 +314,9 @@ def main(page: ft.Page):
                 field.error_text = "Invalid email format"
                 missing_fields.append(field.label)
             elif field == username:
-                if not re.match(username_pattern, value):
+                if len(value) < 4:
                     field.border_color = ft.colors.RED_400
-                    field.error_text = "Username must be 4-12 characters, only letters, digits, or underscore"
+                    field.error_text = "Username must be at least 4 characters"
                     missing_fields.append(field.label)
                 else:
                     try:
@@ -358,18 +332,13 @@ def main(page: ft.Page):
                         field.border_color = ft.colors.RED_400
                         field.error_text = "Error checking username"
                         missing_fields.append(field.label)
-            elif field == password:
-                if not re.match(password_pattern, value):
-                    field.border_color = ft.colors.RED_400
-                    field.error_text = "Password can only contain letters, digits, and @#$%"
-                    missing_fields.append(field.label)
-                elif len(value) < 7 or len(value) > 16:
-                    field.border_color = ft.colors.RED_400
-                    field.error_text = "Password must be 7-16 characters"
-                    missing_fields.append(field.label)
-            elif field == full_name and len(value) > 50:
+            elif field == password and len(value) < 7:
                 field.border_color = ft.colors.RED_400
-                field.error_text = "Name cannot exceed 50 characters"
+                field.error_text = "Password must be at least 7 characters"
+                missing_fields.append(field.label)
+            elif field == full_name and len(value) < 4:
+                field.border_color = ft.colors.RED_400
+                field.error_text = "Full name must be at least 4 characters"
                 missing_fields.append(field.label)
         page.update()
         if len(missing_fields) == 1:

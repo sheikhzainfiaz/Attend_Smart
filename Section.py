@@ -74,9 +74,15 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
+        # Custom input filter for section name
+    class SectionNameInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[A-Z0-9-]*$')
+
+    # Updated TextField with input filter and max_length
     name = ft.TextField(
         label="Section Name",
-        hint_text="Enter section name (e.g., SEA)",
+        hint_text="Enter section name (e.g., SE1-A)",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -87,6 +93,8 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         width=720,
+        max_length=10,  # Enforce maximum length
+        input_filter=SectionNameInputFilter(),  # Restrict to uppercase letters, digits, hyphens
         on_change=lambda e: validate_section_name(e.control.value)
     )
     semester = ft.Dropdown(
@@ -182,11 +190,11 @@ def main(page: ft.Page):
         page.update()
 
     def validate_section_name(value):
-        section_pattern = r'^[A-Z0-9-]{2,10}$'
+        section_pattern = r'^[A-Z0-9-]{3,10}$'
         if value:
-            if not re.match(section_pattern, value):
+            if len(value) < 3:
                 name.border_color = ft.colors.RED_400
-                name.error_text = "Section name must be 2-10 characters, only uppercase letters, digits, or hyphens"
+                name.error_text = "Section name must be at least 3 characters"
                 page.update()
                 return
             try:
@@ -197,7 +205,7 @@ def main(page: ft.Page):
                     name.border_color = ft.colors.RED_400
                     name.error_text = "Section name already in use"
                 else:
-                    name.border_color = accent_color
+                    name.border_color = ft.colors.GREEN_600
                     name.error_text = None
                 conn.close()
             except mysql.connector.Error as err:
@@ -211,16 +219,16 @@ def main(page: ft.Page):
 
     def validate_fields(fields):
         reset_field_borders()
-        section_pattern = r'^[A-Z0-9-]{2,10}$'
+        section_pattern = r'^[A-Z0-9-]{3,10}$'
         missing_fields = []
         for field, value in fields:
             if not value:
                 field.border_color = ft.colors.RED_400
                 missing_fields.append(field.label)
             elif field == name:
-                if not re.match(section_pattern, value):
+                if len(value) < 3:
                     field.border_color = ft.colors.RED_400
-                    field.error_text = "Section name must be 2-10 characters, only uppercase letters, digits, or hyphens"
+                    field.error_text = "Section name must be at least 3 characters"
                     missing_fields.append(field.label)
                 else:
                     try:
@@ -231,6 +239,9 @@ def main(page: ft.Page):
                             field.border_color = ft.colors.RED_400
                             field.error_text = "Section name already in use"
                             missing_fields.append(field.label)
+                        else:
+                            field.border_color = ft.colors.GREEN_600
+                            field.error_text = None
                         conn.close()
                     except mysql.connector.Error as err:
                         field.border_color = ft.colors.RED_400

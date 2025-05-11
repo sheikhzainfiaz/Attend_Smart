@@ -64,19 +64,16 @@ def run_in_thread(func, *args):
     thread.start()
 
 def main(page: ft.Page, teacher_id=1):
-    logging.debug("Starting mark attendance application")
-
-    # Window settings
+    logging.debug("Starting manage_attendance application")
     page.title = "Mark Attendance - Face Recognition System"
-    page.window_width = 1920
-    page.window_height = 1080
-    page.window_resizable = True
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.padding = 0
     page.scroll = None
+    page.window_width = 1280
+    page.window_height = 720
+    page.bgcolor = ft.colors.BLUE_GREY_900
 
-    # Colors
     primary_color = ft.colors.BLUE_600
     accent_color = ft.colors.CYAN_400
     card_bg = ft.LinearGradient(

@@ -1,6 +1,7 @@
 import flet as ft
 import mysql.connector
 import logging
+import re
 from back_button import create_back_button
 from Dash import show_main
 
@@ -75,10 +76,20 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Text field for CourseCode
+        # Custom input filter for course code
+    class CourseCodeInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[A-Z0-9-]*$')
+
+    # Custom input filter for course name
+    class CourseNameInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[a-zA-Z\s]*$')
+
+    # Updated TextField for CourseCode
     course_code = ft.TextField(
         label="Course Code",
-        hint_text="Enter course code (e.g., CS420)",
+        hint_text="Enter course code (e.g., SEC-2078)",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -89,12 +100,15 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
+        max_length=10,
+        input_filter=CourseCodeInputFilter(),
+        on_change=lambda e: validate_course_code(e.control.value)
     )
 
-    # Text field for CourseName
+    # Updated TextField for CourseName
     course_name = ft.TextField(
         label="Course Name",
-        hint_text="Enter course name (e.g., Construction)",
+        hint_text="Enter course name (e.g., Software Construction)",
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=True,
@@ -105,6 +119,9 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         width=720,
+        max_length=50,
+        input_filter=CourseNameInputFilter(),
+        on_change=lambda e: validate_course_name(e.control.value)
     )
 
     # Dropdown for CreditHours
@@ -174,13 +191,120 @@ def main(page: ft.Page):
         credit_hours.border_color = accent_color
         page.update()
 
+        # Validation function for course code
+    def validate_course_code(value):
+        course_code_pattern = r'^[A-Z0-9-]{6,10}$'
+        if value:
+            if len(value) < 6:
+                course_code.border_color = ft.Colors.RED_400
+                course_code.error_text = "Course code must be at least 6 characters"
+                page.update()
+                return
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                if cursor.fetchone():
+                    course_code.border_color = ft.Colors.RED_400
+                    course_code.error_text = "Course code already in use"
+                else:
+                    course_code.border_color = ft.Colors.GREEN_600
+                    course_code.error_text = None
+                conn.close()
+            except mysql.connector.Error as err:
+                course_code.border_color = ft.Colors.RED_400
+                course_code.error_text = "Error checking course code"
+                logging.error(f"Database error in validate_course_code: {err}")
+        else:
+            course_code.border_color = accent_color
+            course_code.error_text = None
+        page.update()
+
+    # Validation function for course name
+    def validate_course_name(value):
+        course_name_pattern = r'^[a-zA-Z\s]{10,50}$'
+        if value:
+            if len(value) < 10:
+                course_name.border_color = ft.Colors.RED_400
+                course_name.error_text = "Course name must be at least 10 characters"
+                page.update()
+                return
+            try:
+                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                cursor = conn.cursor()
+                cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                if cursor.fetchone():
+                    course_name.border_color = ft.Colors.RED_400
+                    course_name.error_text = "Course name already in use"
+                else:
+                    course_name.border_color = ft.Colors.GREEN_600
+                    course_name.error_text = None
+                conn.close()
+            except mysql.connector.Error as err:
+                course_name.border_color = ft.Colors.RED_400
+                course_name.error_text = "Error checking course name"
+                logging.error(f"Database error in validate_course_name: {err}")
+        else:
+            course_name.border_color = accent_color
+            course_name.error_text = None
+        page.update()
+
+    # Updated validate_fields function
     def validate_fields(fields):
         reset_field_borders()
+        course_code_pattern = r'^[A-Z0-9-]{6,10}$'
+        course_name_pattern = r'^[a-zA-Z\s]{10,50}$'
         missing_fields = []
         for field, value in fields:
             if not value:
                 field.border_color = ft.Colors.RED_400
                 missing_fields.append(field.label)
+            elif field == course_code:
+                if len(value) < 6:
+                    field.border_color = ft.Colors.RED_400
+                    field.error_text = "Course code must be at least 6 characters"
+                    missing_fields.append(field.label)
+                else:
+                    try:
+                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                        if cursor.fetchone():
+                            field.border_color = ft.Colors.RED_400
+                            field.error_text = "Course code already in use"
+                            missing_fields.append(field.label)
+                        else:
+                            field.border_color = ft.Colors.GREEN_600
+                            field.error_text = None
+                        conn.close()
+                    except mysql.connector.Error as err:
+                        field.border_color = ft.Colors.RED_400
+                        field.error_text = "Error checking course code"
+                        missing_fields.append(field.label)
+                        logging.error(f"Database error in validate_fields: {err}")
+            elif field == course_name:
+                if len(value) < 10:
+                    field.border_color = ft.Colors.RED_400
+                    field.error_text = "Course name must be at least 10 characters"
+                    missing_fields.append(field.label)
+                else:
+                    try:
+                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                        if cursor.fetchone():
+                            field.border_color = ft.Colors.RED_400
+                            field.error_text = "Course name already in use"
+                            missing_fields.append(field.label)
+                        else:
+                            field.border_color = ft.Colors.GREEN_600
+                            field.error_text = None
+                        conn.close()
+                    except mysql.connector.Error as err:
+                        field.border_color = ft.Colors.RED_400
+                        field.error_text = "Error checking course name"
+                        missing_fields.append(field.label)
+                        logging.error(f"Database error in validate_fields: {err}")
         page.update()
         if len(missing_fields) == 1:
             return f"{missing_fields[0]} is required!"

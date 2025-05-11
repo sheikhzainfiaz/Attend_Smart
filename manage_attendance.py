@@ -57,9 +57,10 @@ def main_manage(page: ft.Page, teacher_id=1):
         course_section_dropdown = ft.Dropdown(
             label="Select Course and Section",
             options=[],
+            value=None,
             border_color=accent_color,
             focused_border_color=primary_color,
-            filled=True,
+            filled=False,
             # bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
             border_radius=10,
             text_style=ft.TextStyle(color=ft.colors.WHITE),
