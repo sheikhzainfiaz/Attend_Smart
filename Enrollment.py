@@ -90,6 +90,19 @@ def main(page: ft.Page):
         on_change=lambda e: update_course_dropdown(e.control.value)
     )
 
+    # Message container for section course status
+    section_message = ft.Container(
+        content=ft.Text(
+            "All courses for this section have been occupied.",
+            color=ft.Colors.RED_400,
+            size=14,
+            text_align=ft.TextAlign.CENTER
+        ),
+        visible=False,
+        alignment=ft.alignment.center,
+        width=720
+    )
+
     # Dropdown for Teacher_ID
     teacher_dropdown = ft.Dropdown(
         label="Teacher",
@@ -180,11 +193,13 @@ def main(page: ft.Page):
         return None
 
     def clear_form():
+        # Explicitly deselect all dropdowns
         section_dropdown.value = None
         teacher_dropdown.value = None
         course_dropdown.value = None
         search_field.value = ""
         selected_ids.current = None
+        section_message.visible = False  # Hide section message
         reset_field_borders()
         update_course_dropdown(None)  # Reset course dropdown to show all courses
         update_table()
@@ -235,6 +250,9 @@ def main(page: ft.Page):
             courses = cursor.fetchall()
             course_dropdown.options = [ft.dropdown.Option(key=str(c[0]), text=f"{c[1]} - {c[2]}") for c in courses]
             course_dropdown.value = None
+            # Show message if no courses are available for the selected section
+            section_message.visible = section_id is not None and not courses
+            logging.debug(f"Section message visible: {section_message.visible}, Courses available: {len(courses)}")
             conn.close()
             page.update()
         except mysql.connector.Error as err:
@@ -337,58 +355,6 @@ def main(page: ft.Page):
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
             page.update()
 
-    def update_enrollment(e):
-        logging.debug("Update button clicked")
-        if not selected_ids.current:
-            show_alert_dialog("Validation Error", "Please select an enrollment to update!", is_error=True)
-            logging.warning("Update failed: No enrollment selected")
-            page.update()
-            return
-
-        section = section_dropdown.value
-        teacher = teacher_dropdown.value
-        course = course_dropdown.value
-
-        # Validate fields
-        fields = [
-            (section_dropdown, section),
-            (teacher_dropdown, teacher),
-            (course_dropdown, course),
-        ]
-        error_message = validate_fields(fields)
-        if error_message:
-            logging.warning(f"Update failed: {error_message}")
-            show_alert_dialog("Validation Error", error_message, is_error=True)
-            return
-
-        def confirm_update():
-            try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE enrollment SET Teacher_ID=%s, CourseID=%s, SectionID=%s WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
-                    (
-                        teacher,
-                        course,
-                        section,
-                        selected_ids.current["Teacher_ID"],
-                        selected_ids.current["CourseID"],
-                        selected_ids.current["SectionID"]
-                    )
-                )
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Enrollment updated successfully!", is_success=True)
-                logging.info(f"Updated enrollment: Teacher {teacher}, Course {course}, Section {section}")
-                clear_form()
-            except mysql.connector.Error as err:
-                logging.error(f"Database error: {err}")
-                show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
-                page.update()
-
-        show_confirm_dialog("Confirm Update", "Are you sure you want to update this enrollment?", confirm_update)
-
     def delete_enrollment(e):
         logging.debug("Delete button clicked")
         if not selected_ids.current:
@@ -429,20 +395,6 @@ def main(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=12),
             padding=ft.padding.symmetric(horizontal=20, vertical=15),
             bgcolor=primary_color,
-            color=ft.Colors.WHITE,
-            elevation={"default": 5, "hovered": 8},
-            animation_duration=300,
-            text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-            overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
-        ),
-    )
-    update_btn = ft.ElevatedButton(
-        text="Update",
-        on_click=update_enrollment,
-        style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=12),
-            padding=ft.padding.symmetric(horizontal=20, vertical=15),
-            bgcolor=ft.Colors.AMBER_600,
             color=ft.Colors.WHITE,
             elevation={"default": 5, "hovered": 8},
             animation_duration=300,
@@ -505,7 +457,7 @@ def main(page: ft.Page):
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Text(
-                    "Add, update, or delete enrollment records",
+                    "Add or delete enrollment records",
                     size=16,
                     color=ft.Colors.BLUE_200,
                     text_align=ft.TextAlign.CENTER,
@@ -514,10 +466,11 @@ def main(page: ft.Page):
                 ft.Column(
                     [
                         section_dropdown,
+                        section_message,
                         teacher_dropdown,
                         course_dropdown,
                         ft.Row(
-                            [add_btn, update_btn, delete_btn, clear_btn],
+                            [add_btn, delete_btn, clear_btn],
                             alignment=ft.MainAxisAlignment.CENTER,
                             spacing=10,
                         ),
