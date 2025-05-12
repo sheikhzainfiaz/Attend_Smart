@@ -23,90 +23,6 @@ DEPARTMENT_CODES = {
     "School of Arts & Design": ["DD"]
 }
 
-# Function to fetch sections from the MySQL database
-def get_sections_from_db():
-    try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="face_db",
-            port=3306
-        )
-        cursor = conn.cursor()
-        cursor.execute("SELECT SectionID, Name, Department FROM section")
-        sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
-        conn.close()
-        logging.debug(f"Fetched {len(sections)} sections: {sections}")
-        return sections
-    except mysql.connector.Error as err:
-        logging.error(f"Database error fetching sections: {err}")
-        return []
-
-# Function to get department by SectionID
-def get_department_by_section(section_id):
-    if not section_id:
-        return None
-    try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="face_db",
-            port=3306
-        )
-        cursor = conn.cursor()
-        cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
-        department = cursor.fetchone()
-        conn.close()
-        return department[0].strip() if department else None
-    except mysql.connector.Error as err:
-        logging.error(f"Database error fetching department: {err}")
-        return None
-
-# Function to get department code from department name
-def get_dept_code(department):
-    for dept, codes in DEPARTMENT_CODES.items():
-        if dept == department:
-            return codes[0]  # Return the first valid code
-    return None
-
-# Function to validate and modify roll number
-def validate_and_modify_roll_number(roll_no, department):
-    if not roll_no or not department:
-        return "", "Roll number and section are required!"
-
-    # Extract components if they exist
-    parts = roll_no.split('-')
-    current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
-    default_dept_code = get_dept_code(department)
-
-    if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:  # Only 4 digits (e.g., 1200)
-        return f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}", ""
-    elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:  # YY-XXXX (e.g., 23-1200)
-        return f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}", ""
-    elif len(parts) == 4:  # Full format (e.g., YY-NTU-DD-NNNN)
-        year, _, dept_code, number = parts
-        if not year.isdigit() or len(year) != 2 or not number.isdigit() or len(number) != 4:
-            return "", "Invalid year or number format!"
-        if not (20 <= int(year) <= 25):
-            return "", "Invalid year in roll number! Use 20-25."
-        if dept_code != default_dept_code:
-            return f"{year}-NTU-{default_dept_code}-{number}", f"Updated department code to {default_dept_code} for {department}!"
-        return roll_no, ""
-    else:
-        return "", "Invalid roll number format! Use YY-NTU-DD-NNNN, YY-XXXX, or XXXX."
-
-# Function to validate full name
-def validate_full_name(name):
-    if not name:
-        return False, "Full name is required!"
-    if len(name) < 2 or len(name) > 50:
-        return False, "Full name must be between 2 and 50 characters!"
-    if not re.match(r"^[A-Za-z\s]+$", name):
-        return False, "Full name can only contain letters and spaces!"
-    return True, ""
-
 def main(page: ft.Page):
     logging.debug("Starting student management page")
     page.title = "Student Management - Face Recognition System"
@@ -167,62 +83,20 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
-    # Function to capture photos
-    def take_photo_and_save(roll_number):
-        if not roll_number:
-            show_alert_dialog("Error", "Roll Number is required!", is_error=True)
-            return None
+        # Custom input filter for full name
+    class LettersAndSpacesInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[A-Za-z\s]*$')
 
-        save_path = os.path.join("photos", roll_number)
-        os.makedirs(save_path, exist_ok=True)
+    # Custom input filter for roll number
+    class RollNoInputFilter(ft.InputFilter):
+        def __init__(self):
+            super().__init__(regex_string=r'^[0-9A-Z-]*$')
 
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            show_alert_dialog("Error", "Failed to open camera!", is_error=True)
-            logging.error("Camera could not be opened")
-            return None
-
-        count = 1
-        max_photos = 5
-
-        while count <= max_photos:
-            success, img = cap.read()
-            if not success:
-                show_alert_dialog("Error", "Failed to capture image!", is_error=True)
-                logging.error("Failed to capture image")
-                break
-
-            cv2.imshow("Take Photo", img)
-            key = cv2.waitKey(1) & 0xFF
-
-            if key == ord('s'):
-                height, width, _ = img.shape
-                square_size = min(height, width)
-                x = (width - square_size) // 2
-                y = (height - square_size) // 2
-                square_img = img[y:y + square_size, x:x + square_size]
-                square_img = cv2.resize(square_img, (224, 224))
-                filename = os.path.join(save_path, f"{roll_number}_{count}.jpg")
-                cv2.imwrite(filename, square_img)
-                logging.debug(f"Saved {filename}")
-                count += 1
-
-            elif key == ord('q'):
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-        if count > 1:
-            return filename
-        else:
-            show_alert_dialog("Warning", "No photos were saved!", is_error=True)
-            return None
-
-    # Form fields
+    # Updated TextField for Roll Number
     roll_no = ft.TextField(
         label="Roll Number",
-        hint_text="e.g., 24-NTU-CS-1200, 24-1200, or 1200",
+        hint_text="e.g., 24-NTU-CS-1200 or 1200 or 24-1200",
         autofocus=True,
         border_color=accent_color,
         focused_border_color=primary_color,
@@ -233,8 +107,12 @@ def main(page: ft.Page):
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
-        on_change=lambda e: validate_roll_no_live(e.control.value.strip()),
+        max_length=14,
+        input_filter=RollNoInputFilter(),
+        on_change=lambda e: validate_roll_no_live(e.control.value.strip())
     )
+
+    # Updated TextField for Full Name
     full_name = ft.TextField(
         label="Full Name",
         hint_text="Enter student full name",
@@ -243,59 +121,37 @@ def main(page: ft.Page):
         filled=True,
         bgcolor=ft.colors.with_opacity(0.05, ft.colors.WHITE),
         border_radius=10,
-        # input_filter=ft.TextOnlyInputFilter(),
         prefix_icon=ft.icons.PERSON_OUTLINE,
         text_style=ft.TextStyle(color=ft.colors.WHITE),
         label_style=ft.TextStyle(color=ft.colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
+        max_length=50,
+        input_filter=LettersAndSpacesInputFilter(),
+        on_change=lambda e: validate_full_name_live(e.control.value.strip())
     )
-
-    # Fetch sections from the database
+    
+         # Function to fetch sections from the MySQL database
+    def get_sections_from_db():
+        try:
+            conn = mysql.connector.connect(
+                host="localhost",
+                user="root",
+                password="root",
+                database="face_db",
+                port=3306
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT SectionID, Name, Department FROM section")
+            sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
+            conn.close()
+            logging.debug(f"Fetched {len(sections)} sections: {sections}")
+            return sections
+        except mysql.connector.Error as err:
+            logging.error(f"Database error fetching sections: {err}")
+            return []
+    
+       # Fetch sections from the database
     sections = get_sections_from_db()
-
-    # Dropdown for section_id
-    def generate_roll_number(section_id):
-        if not section_id:
-            roll_no.value = ""
-            roll_no.error_text = None
-            roll_no.update()
-            return
-
-        # Get the department for the selected section
-        department = get_department_by_section(section_id)
-        if not department:
-            roll_no.value = ""
-            roll_no.error_text = "Unable to fetch department for selected section!"
-            roll_no.update()
-            return
-
-        # Get the current year (last two digits)
-        current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
-        default_dept_code = get_dept_code(department)
-
-        # Validate and modify the existing roll number
-        new_roll, message = validate_and_modify_roll_number(roll_no.value, department)
-        if new_roll:
-            roll_no.value = new_roll
-            if message:
-                roll_no.error_text = message
-            else:
-                roll_no.error_text = None
-        else:
-            # If invalid, generate a new roll number with default values
-            parts = roll_no.value.split('-')
-            if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:  # Only 4 digits
-                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}"
-                roll_no.error_text = None
-            elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:  # YY-XXXX
-                roll_no.value = f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}"
-                roll_no.error_text = None
-            else:  # Full or invalid format
-                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-0001"
-                roll_no.error_text = "Roll number updated to default format!"
-
-        logging.debug(f"Generated/Modified roll number: {roll_no.value} for department: {department}")
-        roll_no.update()
 
     section_id = ft.Dropdown(
         label="Section",
@@ -357,7 +213,272 @@ def main(page: ft.Page):
         hint_style=ft.TextStyle(color=ft.colors.BLUE_200),
         on_change=lambda e: update_table(e.control.value.strip()),
     )
+    
+    # Updated function to validate and modify roll number (removed length check)
+    def validate_and_modify_roll_number(roll_no, department):
+        if not roll_no or not department:
+            return "", "Roll number and section are required!"
 
+        parts = roll_no.split('-')
+        current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
+        default_dept_code = get_dept_code(department) or "CS"
+
+        # Full format: YY-NTU-DD-NNNN
+        if len(parts) == 4:
+            year, ntu, dept_code, number = parts
+            if (year.isdigit() and len(year) == 2 and
+                ntu.upper() == "NTU" and
+                number.isdigit() and len(number) == 4 and
+                20 <= int(year) <= 25):
+                return f"{year}-NTU-{default_dept_code}-{number}", ""  # Update department code if necessary
+            return "", "Invalid roll number format! Use YY-NTU-DD-NNNN or convert from XXXX/YY-XXXX."
+        # Short formats: XXXX or YY-XXXX
+        elif len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:
+            return f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}", ""
+        elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:
+            return f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}", ""
+        return "", "Invalid roll number format! Use YY-NTU-DD-NNNN or convert from XXXX/YY-XXXX."
+
+    # Real-time validation for roll number
+    def validate_roll_no_live(roll):
+        reset_field_borders()
+        if roll and section_id.value:
+            department = get_department_by_section(section_id.value)
+            new_roll, message = validate_and_modify_roll_number(roll, department)
+            if new_roll and new_roll != roll:
+                roll_no.value = new_roll
+            if not new_roll:
+                roll_no.border_color = ft.colors.RED_400
+                roll_no.error_text = message
+            else:
+                try:
+                    conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+                    result = cursor.fetchone()
+                    logging.debug(f"Duplicate check for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+                    if result:
+                        roll_no.border_color = ft.colors.RED_400
+                        roll_no.error_text = "Roll number already in use"
+                    else:
+                        roll_no.border_color = ft.colors.GREEN_600
+                        roll_no.error_text = None
+                    conn.close()
+                except mysql.connector.Error as err:
+                    roll_no.border_color = ft.colors.RED_400
+                    roll_no.error_text = "Error checking roll number"
+                    logging.error(f"Database error in validate_roll_no_live: {err}")
+        else:
+            roll_no.border_color = accent_color
+            roll_no.error_text = None
+        page.update()
+
+    # Validation function for roll number (removed length check)
+    def validate_roll_no(roll, department):
+        if not roll:
+            roll_no.border_color = accent_color
+            roll_no.error_text = None
+            page.update()
+            return
+
+        new_roll, message = validate_and_modify_roll_number(roll, department)
+        if not new_roll:
+            roll_no.border_color = ft.colors.RED_400
+            roll_no.error_text = message
+            page.update()
+            return
+
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+            result = cursor.fetchone()
+            logging.debug(f"Duplicate check in validate_roll_no for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+            if result:
+                roll_no.border_color = ft.colors.RED_400
+                roll_no.error_text = "Roll number already in use"
+            else:
+                roll_no.border_color = ft.colors.GREEN_600
+                roll_no.error_text = None
+            conn.close()
+        except mysql.connector.Error as err:
+            roll_no.border_color = ft.colors.RED_400
+            roll_no.error_text = "Error checking roll number"
+            logging.error(f"Database error in validate_roll_no: {err}")
+        page.update()
+
+    # Updated validate_fields function (removed length check)
+    def validate_fields(fields, check_roll_no=True, check_name=True):
+        reset_field_borders()
+        errors = []
+        for field, value, label in fields:
+            if not value:
+                field.border_color = ft.colors.RED_400
+                errors.append(f"{label} is required!")
+            elif field == roll_no and check_roll_no:
+                department = get_department_by_section(section_id.value)
+                new_roll, error = validate_and_modify_roll_number(value, department)
+                if not new_roll:
+                    field.border_color = ft.colors.RED_400
+                    errors.append(error)
+                else:
+                    roll_no.value = new_roll
+                    try:
+                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+                        result = cursor.fetchone()
+                        logging.debug(f"Duplicate check in validate_fields for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+                        if result:
+                            field.border_color = ft.colors.RED_400
+                            errors.append("Roll number already in use")
+                        conn.close()
+                    except mysql.connector.Error as err:
+                        field.border_color = ft.colors.RED_400
+                        errors.append("Error checking roll number")
+                        logging.error(f"Database error in validate_fields: {err}")
+            elif field == full_name and check_name:
+                is_valid, error = validate_full_name(value)
+                if not is_valid:
+                    field.border_color = ft.colors.RED_400
+                    errors.append(error)
+        page.update()
+        return errors
+
+    # Updated select_row function to ensure proper roll number handling
+    def select_row(roll):
+        logging.debug(f"Selected row with Roll_no: {roll}")
+        selected_roll_no.current = roll
+        try:
+            conn = mysql.connector.connect(
+                host="localhost",
+                user="root",
+                password="root",
+                database="face_db",
+                port=3306
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student WHERE Roll_no=%s", (roll,))
+            student = cursor.fetchone()
+            conn.close()
+            if student:
+                roll_no.value = student[0]
+                full_name.value = student[1]
+                section_id.value = str(student[2]) if student[2] else None
+                photo_sample.value = student[3] if student[3] else None
+                logging.debug(f"Selected student - Roll_no: {roll_no.value}, Section: {section_id.value}, Photo Sample: {photo_sample.value}")
+                # Validate the roll number after selection
+                if section_id.value:
+                    department = get_department_by_section(section_id.value)
+                    validate_roll_no(roll_no.value, department)
+                else:
+                    roll_no.border_color = accent_color
+                    roll_no.error_text = None
+            reset_field_borders()
+            page.update()
+        except mysql.connector.Error as err:
+            show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
+
+    # Real-time validation for full name
+    def validate_full_name_live(name):
+        if name:
+            if len(name) < 4:
+                full_name.border_color = ft.colors.RED_400
+                full_name.error_text = "Full name must be at least 4 characters"
+            else:
+                full_name.border_color = ft.colors.GREEN_600
+                full_name.error_text = None
+        else:
+            full_name.border_color = accent_color
+            full_name.error_text = None
+        page.update()
+
+
+    # Updated validate_full_name function
+    def validate_full_name(name):
+        if not name:
+            return False, "Full name is required!"
+        if len(name) < 4:
+            return False, "Full name must be at least 4 characters"
+        return True, ""
+
+
+    # Updated generate_roll_number function
+    def generate_roll_number(section_id):
+        if not section_id:
+            roll_no.value = ""
+            roll_no.error_text = None
+            roll_no.update()
+            return
+
+        department = get_department_by_section(section_id) or "Department of Computer Science"
+        current_year = datetime.now().year % 100 - 1  # e.g., 24 for 2025
+        default_dept_code = get_dept_code(department) or "CS"
+
+        new_roll, message = validate_and_modify_roll_number(roll_no.value, department)
+        if new_roll:
+            roll_no.value = new_roll
+            roll_no.error_text = None
+        else:
+            parts = roll_no.value.split('-')
+            if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:
+                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-{parts[0]}"
+                roll_no.error_text = None
+            elif len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 2 and parts[1].isdigit() and len(parts[1]) == 4:
+                roll_no.value = f"{parts[0]}-NTU-{default_dept_code}-{parts[1]}"
+                roll_no.error_text = None
+            else:
+                roll_no.value = f"{current_year:02d}-NTU-{default_dept_code}-0001"
+                roll_no.error_text = None
+
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (roll_no.value, selected_roll_no.current or ""))
+            if cursor.fetchone():
+                roll_no.border_color = ft.colors.RED_400
+                roll_no.error_text = "Roll number already in use"
+            else:
+                roll_no.border_color = ft.colors.GREEN_600
+                roll_no.error_text = None
+            conn.close()
+        except mysql.connector.Error as err:
+            roll_no.border_color = ft.colors.RED_400
+            roll_no.error_text = "Error checking roll number"
+            logging.error(f"Database error in generate_roll_number: {err}")
+
+        logging.debug(f"Generated/Modified roll number: {roll_no.value} for department: {department}")
+        roll_no.update()
+
+
+    # Function to get department by SectionID
+    def get_department_by_section(section_id):
+        if not section_id:
+            return None
+        try:
+            conn = mysql.connector.connect(
+                host="localhost",
+                user="root",
+                password="root",
+                database="face_db",
+                port=3306
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
+            department = cursor.fetchone()
+            conn.close()
+            return department[0].strip() if department else None
+        except mysql.connector.Error as err:
+            logging.error(f"Database error fetching department: {err}")
+            return None
+
+    # Function to get department code from department name
+    def get_dept_code(department):
+        for dept, codes in DEPARTMENT_CODES.items():
+            if dept == department:
+                return codes[0]  # Return the first valid code
+        return None
+    
     # DataTable
     data_table = ft.DataTable(
         border=ft.Border(
@@ -387,50 +508,58 @@ def main(page: ft.Page):
         photo_sample.border_color = accent_color
         roll_no.error_text = None
         page.update()
+        
+    # Function to capture photos
+    def take_photo_and_save(roll_number):
+        if not roll_number:
+            show_alert_dialog("Error", "Roll Number is required!", is_error=True)
+            return None
 
-    # Helper function to validate fields
-    def validate_fields(fields, check_roll_no=True, check_name=True):
-        reset_field_borders()
-        errors = []
-        for field, value, label in fields:
-            if not value:
-                field.border_color = ft.colors.RED_400
-                errors.append(f"{label} is required!")
-            elif field == roll_no and check_roll_no:
-                department = get_department_by_section(section_id.value)
-                is_valid, error = validate_and_modify_roll_number(value, department)
-                if not is_valid:
-                    field.border_color = ft.colors.RED_400
-                    errors.append(error)
-            elif field == full_name and check_name:
-                is_valid, error = validate_full_name(value)
-                if not is_valid:
-                    field.border_color = ft.colors.RED_400
-                    errors.append(error)
-        page.update()
-        return errors
+        save_path = os.path.join("photos", roll_number)
+        os.makedirs(save_path, exist_ok=True)
 
-    # Live validation for roll number
-    def validate_roll_no_live(roll):
-        reset_field_borders()
-        if roll and section_id.value:
-            department = get_department_by_section(section_id.value)
-            logging.debug(f"Validating roll {roll} against department: {department}")
-            new_roll, message = validate_and_modify_roll_number(roll, department)
-            if new_roll and new_roll != roll:
-                roll_no.value = new_roll
-                if message:
-                    roll_no.error_text = message
-                else:
-                    roll_no.error_text = None
-            elif not new_roll:
-                roll_no.border_color = ft.colors.RED_400
-                roll_no.error_text = message or "Invalid roll number format!"
-            else:
-                roll_no.error_text = None
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            show_alert_dialog("Error", "Failed to open camera!", is_error=True)
+            logging.error("Camera could not be opened")
+            return None
+
+        count = 1
+        max_photos = 5
+
+        while count <= max_photos:
+            success, img = cap.read()
+            if not success:
+                show_alert_dialog("Error", "Failed to capture image!", is_error=True)
+                logging.error("Failed to capture image")
+                break
+
+            cv2.imshow("Take Photo", img)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('s'):
+                height, width, _ = img.shape
+                square_size = min(height, width)
+                x = (width - square_size) // 2
+                y = (height - square_size) // 2
+                square_img = img[y:y + square_size, x:x + square_size]
+                square_img = cv2.resize(square_img, (224, 224))
+                filename = os.path.join(save_path, f"{roll_number}_{count}.jpg")
+                cv2.imwrite(filename, square_img)
+                logging.debug(f"Saved {filename}")
+                count += 1
+
+            elif key == ord('q'):
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+        if count > 1:
+            return filename
         else:
-            roll_no.error_text = None
-        page.update()
+            show_alert_dialog("Warning", "No photos were saved!", is_error=True)
+            return None
 
     def fetch_students(search_term=""):
         logging.debug(f"Fetching students with search term: {search_term}")
@@ -478,32 +607,6 @@ def main(page: ft.Page):
         logging.debug(f"Table updated with {len(data_table.rows)} rows")
         page.update()
 
-    def select_row(roll):
-        logging.debug(f"Selected row with Roll_no: {roll}")
-        selected_roll_no.current = roll
-        try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student WHERE Roll_no=%s", (roll,))
-            student = cursor.fetchone()
-            conn.close()
-            if student:
-                roll_no.value = student[0]
-                full_name.value = student[1]
-                section_id.value = str(student[2]) if student[2] else None
-                photo_sample.value = student[3] if student[3] else None
-                logging.debug(f"Selected student - Section: {section_id.value}, Photo Sample: {photo_sample.value}")
-            reset_field_borders()
-            roll_no.error_text = None
-            page.update()
-        except mysql.connector.Error as err:
-            show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
 
     def add_click(e):
         logging.debug("Add button clicked")
