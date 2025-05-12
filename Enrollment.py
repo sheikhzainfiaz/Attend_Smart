@@ -36,7 +36,6 @@ def main(page: ft.Page):
                     ft.TextButton("OK", on_click=lambda e: close_dialog())
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                # bgcolor=ft.Colors.WHITE
             )
 
             def close_dialog():
@@ -64,7 +63,6 @@ def main(page: ft.Page):
                 ft.TextButton("Yes", on_click=lambda e: (close_dialog(), on_confirm()))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-            # bgcolor=ft.Colors.WHITE
         )
 
         def close_dialog():
@@ -75,6 +73,23 @@ def main(page: ft.Page):
         dialog.open = True
         page.update()
 
+    # Dropdown for SectionID
+    section_dropdown = ft.Dropdown(
+        label="Section",
+        hint_text="Select a section",
+        value=None,
+        border_color=accent_color,
+        focused_border_color=primary_color,
+        filled=False,
+        border_radius=10,
+        prefix_icon=ft.icons.CLASS_,
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
+        width=720,
+        on_change=lambda e: update_course_dropdown(e.control.value)
+    )
+
     # Dropdown for Teacher_ID
     teacher_dropdown = ft.Dropdown(
         label="Teacher",
@@ -83,7 +98,6 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        # bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.PERSON,
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
@@ -100,26 +114,8 @@ def main(page: ft.Page):
         border_color=accent_color,
         focused_border_color=primary_color,
         filled=False,
-        # bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
         border_radius=10,
         prefix_icon=ft.icons.BOOK,
-        text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
-        width=720,
-    )
-
-    # Dropdown for SectionID
-    section_dropdown = ft.Dropdown(
-        label="Section",
-        hint_text="Select a section",
-        value=None,
-        border_color=accent_color,
-        focused_border_color=primary_color,
-        filled=False,
-        # bgcolor=ft.Colors.with_opacity(1, ft.Colors.WHITE),
-        border_radius=10,
-        prefix_icon=ft.icons.CLASS_,
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
         label_style=ft.TextStyle(color=ft.Colors.BLUE_200),
         hint_style=ft.TextStyle(color=ft.Colors.BLUE_200),
@@ -164,9 +160,9 @@ def main(page: ft.Page):
     selected_ids = ft.Ref[dict]()
 
     def reset_field_borders():
+        section_dropdown.border_color = accent_color
         teacher_dropdown.border_color = accent_color
         course_dropdown.border_color = accent_color
-        section_dropdown.border_color = accent_color
         page.update()
 
     def validate_fields(fields):
@@ -184,13 +180,15 @@ def main(page: ft.Page):
         return None
 
     def clear_form():
+        section_dropdown.value = None
         teacher_dropdown.value = None
         course_dropdown.value = None
-        section_dropdown.value = None
         search_field.value = ""
         selected_ids.current = None
         reset_field_borders()
+        update_course_dropdown(None)  # Reset course dropdown to show all courses
         update_table()
+        logging.debug("Form cleared, all dropdowns deselected")
         page.update()
 
     def fetch_dropdown_data():
@@ -198,21 +196,45 @@ def main(page: ft.Page):
             conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
             cursor = conn.cursor()
 
-            # Fetch teachers
-            cursor.execute("SELECT Teacher_ID, Full_Name FROM teachers")
-            teachers = cursor.fetchall()
-            teacher_dropdown.options = [ft.dropdown.Option(key=str(t[0]), text=f"{t[0]} - {t[1]}") for t in teachers]
-
-            # Fetch courses
-            cursor.execute("SELECT CourseID, CourseCode, CourseName FROM course")
-            courses = cursor.fetchall()
-            course_dropdown.options = [ft.dropdown.Option(key=str(c[0]), text=f"{c[1]} - {c[2]}") for c in courses]
-
             # Fetch sections
             cursor.execute("SELECT SectionID, Name FROM section")
             sections = cursor.fetchall()
             section_dropdown.options = [ft.dropdown.Option(key=str(s[0]), text=f"{s[0]} - {s[1]}") for s in sections]
 
+            # Fetch teachers
+            cursor.execute("SELECT Teacher_ID, Full_Name FROM teachers")
+            teachers = cursor.fetchall()
+            teacher_dropdown.options = [ft.dropdown.Option(key=str(t[0]), text=f"{t[0]} - {t[1]}") for t in teachers]
+
+            # Fetch courses (initially all, will be filtered by section)
+            update_course_dropdown(None)
+
+            conn.close()
+            page.update()
+        except mysql.connector.Error as err:
+            logging.error(f"Database error: {err}")
+            show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
+
+    def update_course_dropdown(section_id):
+        try:
+            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
+            cursor = conn.cursor()
+            if section_id:
+                # Fetch courses not allocated to the selected section
+                query = """
+                    SELECT CourseID, CourseCode, CourseName
+                    FROM course
+                    WHERE CourseID NOT IN (
+                        SELECT CourseID FROM enrollment WHERE SectionID = %s
+                    )
+                """
+                cursor.execute(query, (section_id,))
+            else:
+                # Fetch all courses if no section is selected
+                cursor.execute("SELECT CourseID, CourseCode, CourseName FROM course")
+            courses = cursor.fetchall()
+            course_dropdown.options = [ft.dropdown.Option(key=str(c[0]), text=f"{c[1]} - {c[2]}") for c in courses]
+            course_dropdown.value = None
             conn.close()
             page.update()
         except mysql.connector.Error as err:
@@ -270,24 +292,26 @@ def main(page: ft.Page):
 
     def select_enrollment(teacher_id, course_id, section_id):
         selected_ids.current = {"Teacher_ID": teacher_id, "CourseID": course_id, "SectionID": section_id}
+        section_dropdown.value = str(section_id)
         teacher_dropdown.value = str(teacher_id)
         course_dropdown.value = str(course_id)
-        section_dropdown.value = str(section_id)
+        update_course_dropdown(str(section_id))  # Update course options based on selected section
+        course_dropdown.value = str(course_id)  # Restore selected course
         logging.debug("Form populated with selected enrollment data")
         reset_field_borders()
         page.update()
 
     def add_enrollment(e):
         logging.debug("Add Enrollment button clicked")
+        section = section_dropdown.value
         teacher = teacher_dropdown.value
         course = course_dropdown.value
-        section = section_dropdown.value
 
         # Validate fields
         fields = [
+            (section_dropdown, section),
             (teacher_dropdown, teacher),
             (course_dropdown, course),
-            (section_dropdown, section),
         ]
         error_message = validate_fields(fields)
         if error_message:
@@ -321,15 +345,15 @@ def main(page: ft.Page):
             page.update()
             return
 
+        section = section_dropdown.value
         teacher = teacher_dropdown.value
         course = course_dropdown.value
-        section = section_dropdown.value
 
         # Validate fields
         fields = [
+            (section_dropdown, section),
             (teacher_dropdown, teacher),
             (course_dropdown, course),
-            (section_dropdown, section),
         ]
         error_message = validate_fields(fields)
         if error_message:
@@ -489,9 +513,9 @@ def main(page: ft.Page):
                 ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 ft.Column(
                     [
+                        section_dropdown,
                         teacher_dropdown,
                         course_dropdown,
-                        section_dropdown,
                         ft.Row(
                             [add_btn, update_btn, delete_btn, clear_btn],
                             alignment=ft.MainAxisAlignment.CENTER,
