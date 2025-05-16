@@ -244,7 +244,7 @@ def main(page: ft.Page, teacher_id=1):
             logging.info(f"Marked {status} for Roll No: {roll_no}")
             if status == "Present":
                 run_in_thread(play_beep_sound)  # Run in thread
-                run_in_thread(play_tts_message, f"Attendance marked for {name}")  # Run in thread
+                # run_in_thread(play_tts_message, f"Attendance marked for {name}")  # Run in thread
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
