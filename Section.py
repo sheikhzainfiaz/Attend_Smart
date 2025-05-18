@@ -2,6 +2,7 @@ import flet as ft
 import mysql.connector
 import logging
 import re
+from db_connection import DatabaseConnection
 from back_button import create_back_button
 from Dash import show_main
 
@@ -198,16 +199,15 @@ def main(page: ft.Page):
                 page.update()
                 return
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
-                if cursor.fetchone():
-                    name.border_color = ft.colors.RED_400
-                    name.error_text = "Section name already in use"
-                else:
-                    name.border_color = ft.colors.GREEN_600
-                    name.error_text = None
-                conn.close()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
+                    if cursor.fetchone():
+                        name.border_color = ft.colors.RED_400
+                        name.error_text = "Section name already in use"
+                    else:
+                        name.border_color = ft.colors.GREEN_600
+                        name.error_text = None
             except mysql.connector.Error as err:
                 name.border_color = ft.colors.RED_400
                 name.error_text = "Error checking section name"
@@ -232,17 +232,16 @@ def main(page: ft.Page):
                     missing_fields.append(field.label)
                 else:
                     try:
-                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
-                        if cursor.fetchone():
-                            field.border_color = ft.colors.RED_400
-                            field.error_text = "Section name already in use"
-                            missing_fields.append(field.label)
-                        else:
-                            field.border_color = ft.colors.GREEN_600
-                            field.error_text = None
-                        conn.close()
+                        with DatabaseConnection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT Name FROM section WHERE Name=%s AND SectionID!=%s", (value, selected_id.current or 0))
+                            if cursor.fetchone():
+                                field.border_color = ft.colors.RED_400
+                                field.error_text = "Section name already in use"
+                                missing_fields.append(field.label)
+                            else:
+                                field.border_color = ft.colors.GREEN_600
+                                field.error_text = None
                     except mysql.connector.Error as err:
                         field.border_color = ft.colors.RED_400
                         field.error_text = "Error checking section name"
@@ -267,17 +266,17 @@ def main(page: ft.Page):
 
     def fetch_sections(search_term=""):
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            if search_term:
-                query = "SELECT SectionID, Name, Semester, Department FROM section WHERE Name LIKE %s OR Department LIKE %s"
-                cursor.execute(query, (f"%{search_term}%", f"%{search_term}%"))
-            else:
-                cursor.execute("SELECT SectionID, Name, Semester, Department FROM section")
-            data = cursor.fetchall()
-            conn.close()
-            logging.debug(f"Fetched {len(data)} sections: {data}")
-            return data
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                if search_term:
+                    query = "SELECT SectionID, Name, Semester, Department FROM section WHERE Name LIKE %s OR Department LIKE %s"
+                    cursor.execute(query, (f"%{search_term}%", f"%{search_term}%"))
+                else:
+                    cursor.execute("SELECT SectionID, Name, Semester, Department FROM section")
+                data = cursor.fetchall()
+                
+                logging.debug(f"Fetched {len(data)} sections: {data}")
+                return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Error fetching sections: {err}", is_error=True)
@@ -304,16 +303,15 @@ def main(page: ft.Page):
     def select_section(section_id):
         selected_id.current = section_id
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Name, Semester, Department FROM section WHERE SectionID=%s", (section_id,))
-            s = cursor.fetchone()
-            conn.close()
-            if s:
-                name.value, semester.value, department.value = s
-                logging.debug("Form populated with selected section data")
-            reset_field_borders()
-            page.update()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Name, Semester, Department FROM section WHERE SectionID=%s", (section_id,))
+                s = cursor.fetchone()
+                if s:
+                    name.value, semester.value, department.value = s
+                    logging.debug("Form populated with selected section data")
+                reset_field_borders()
+                page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Error selecting section: {err}", is_error=True)
@@ -337,16 +335,15 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO section (Name, Semester, Department) VALUES (%s, %s, %s)",
-                           (section_name, sem, dept))
-            conn.commit()
-            conn.close()
-            reset_field_borders()
-            show_alert_dialog("Success", "Section added successfully!", is_success=True)
-            logging.info(f"Added section: {section_name}")
-            clear_form()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO section (Name, Semester, Department) VALUES (%s, %s, %s)",
+                            (section_name, sem, dept))
+                conn.commit()
+                reset_field_borders()
+                show_alert_dialog("Success", "Section added successfully!", is_success=True)
+                logging.info(f"Added section: {section_name}")
+                clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Error adding section: {err}", is_error=True)
@@ -377,16 +374,15 @@ def main(page: ft.Page):
 
         def confirm_update():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE section SET Name=%s, Semester=%s, Department=%s WHERE SectionID=%s",
-                               (section_name, sem, dept, selected_id.current))
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Section updated successfully!", is_success=True)
-                logging.info(f"Updated section: {section_name}")
-                clear_form()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE section SET Name=%s, Semester=%s, Department=%s WHERE SectionID=%s",
+                                (section_name, sem, dept, selected_id.current))
+                    conn.commit()
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Section updated successfully!", is_success=True)
+                    logging.info(f"Updated section: {section_name}")
+                    clear_form()
             except mysql.connector.Error as err:
                 logging.error(f"Database error: {err}")
                 show_alert_dialog("Database Error", f"Error updating section: {err}", is_error=True)
@@ -404,15 +400,14 @@ def main(page: ft.Page):
 
         def confirm_delete():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM section WHERE SectionID=%s", (selected_id.current,))
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Section deleted successfully!", is_success=True)
-                logging.info(f"Deleted section: {selected_id.current}")
-                clear_form()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM section WHERE SectionID=%s", (selected_id.current,))
+                    conn.commit()
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Section deleted successfully!", is_success=True)
+                    logging.info(f"Deleted section: {selected_id.current}")
+                    clear_form()
             except mysql.connector.Error as err:
                 logging.error(f"Database error: {err}")
                 show_alert_dialog("Database Error", f"Error deleting section: {err}", is_error=True)

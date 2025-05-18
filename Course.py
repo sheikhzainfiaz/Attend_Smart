@@ -2,6 +2,7 @@ import flet as ft
 import mysql.connector
 import logging
 import re
+from db_connection import DatabaseConnection
 from back_button import create_back_button
 from Dash import show_main
 
@@ -201,16 +202,16 @@ def main(page: ft.Page):
                 page.update()
                 return
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
-                if cursor.fetchone():
-                    course_code.border_color = ft.Colors.RED_400
-                    course_code.error_text = "Course code already in use"
-                else:
-                    course_code.border_color = ft.Colors.GREEN_600
-                    course_code.error_text = None
-                conn.close()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                    if cursor.fetchone():
+                        course_code.border_color = ft.Colors.RED_400
+                        course_code.error_text = "Course code already in use"
+                    else:
+                        course_code.border_color = ft.Colors.GREEN_600
+                        course_code.error_text = None
+                
             except mysql.connector.Error as err:
                 course_code.border_color = ft.Colors.RED_400
                 course_code.error_text = "Error checking course code"
@@ -230,16 +231,16 @@ def main(page: ft.Page):
                 page.update()
                 return
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
-                if cursor.fetchone():
-                    course_name.border_color = ft.Colors.RED_400
-                    course_name.error_text = "Course name already in use"
-                else:
-                    course_name.border_color = ft.Colors.GREEN_600
-                    course_name.error_text = None
-                conn.close()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                    if cursor.fetchone():
+                        course_name.border_color = ft.Colors.RED_400
+                        course_name.error_text = "Course name already in use"
+                    else:
+                        course_name.border_color = ft.Colors.GREEN_600
+                        course_name.error_text = None
+                
             except mysql.connector.Error as err:
                 course_name.border_color = ft.Colors.RED_400
                 course_name.error_text = "Error checking course name"
@@ -266,17 +267,17 @@ def main(page: ft.Page):
                     missing_fields.append(field.label)
                 else:
                     try:
-                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
-                        if cursor.fetchone():
-                            field.border_color = ft.Colors.RED_400
-                            field.error_text = "Course code already in use"
-                            missing_fields.append(field.label)
-                        else:
-                            field.border_color = ft.Colors.GREEN_600
-                            field.error_text = None
-                        conn.close()
+                        with DatabaseConnection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT CourseCode FROM course WHERE CourseCode=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                            if cursor.fetchone():
+                                field.border_color = ft.Colors.RED_400
+                                field.error_text = "Course code already in use"
+                                missing_fields.append(field.label)
+                            else:
+                                field.border_color = ft.Colors.GREEN_600
+                                field.error_text = None
+                        
                     except mysql.connector.Error as err:
                         field.border_color = ft.Colors.RED_400
                         field.error_text = "Error checking course code"
@@ -289,17 +290,17 @@ def main(page: ft.Page):
                     missing_fields.append(field.label)
                 else:
                     try:
-                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
-                        if cursor.fetchone():
-                            field.border_color = ft.Colors.RED_400
-                            field.error_text = "Course name already in use"
-                            missing_fields.append(field.label)
-                        else:
-                            field.border_color = ft.Colors.GREEN_600
-                            field.error_text = None
-                        conn.close()
+                        with DatabaseConnection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT CourseName FROM course WHERE CourseName=%s AND CourseID!=%s", (value, selected_id.current or 0))
+                            if cursor.fetchone():
+                                field.border_color = ft.Colors.RED_400
+                                field.error_text = "Course name already in use"
+                                missing_fields.append(field.label)
+                            else:
+                                field.border_color = ft.Colors.GREEN_600
+                                field.error_text = None
+                        
                     except mysql.connector.Error as err:
                         field.border_color = ft.Colors.RED_400
                         field.error_text = "Error checking course name"
@@ -324,16 +325,16 @@ def main(page: ft.Page):
 
     def fetch_courses(search_term=""):
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            if search_term:
-                cursor.execute("SELECT CourseID, CourseCode, CourseName, CreditHours FROM course WHERE CourseCode LIKE %s", (f"%{search_term}%",))
-            else:
-                cursor.execute("SELECT CourseID, CourseCode, CourseName, CreditHours FROM course")
-            data = cursor.fetchall()
-            conn.close()
-            logging.debug(f"Fetched {len(data)} courses")
-            return data
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                if search_term:
+                    cursor.execute("SELECT CourseID, CourseCode, CourseName, CreditHours FROM course WHERE CourseCode LIKE %s", (f"%{search_term}%",))
+                else:
+                    cursor.execute("SELECT CourseID, CourseCode, CourseName, CreditHours FROM course")
+                data = cursor.fetchall()
+                
+                logging.debug(f"Fetched {len(data)} courses")
+                return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -360,16 +361,16 @@ def main(page: ft.Page):
     def select_course(course_id):
         selected_id.current = course_id
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT CourseCode, CourseName, CreditHours FROM course WHERE CourseID=%s", (course_id,))
-            c = cursor.fetchone()
-            conn.close()
-            if c:
-                course_code.value, course_name.value, credit_hours.value = c[0], c[1], str(c[2])
-                logging.debug("Form populated with selected course data")
-            reset_field_borders()
-            page.update()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT CourseCode, CourseName, CreditHours FROM course WHERE CourseID=%s", (course_id,))
+                c = cursor.fetchone()
+                
+                if c:
+                    course_code.value, course_name.value, credit_hours.value = c[0], c[1], str(c[2])
+                    logging.debug("Form populated with selected course data")
+                reset_field_borders()
+                page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -394,18 +395,18 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO course (CourseCode, CourseName, CreditHours) VALUES (%s, %s, %s)",
-                (code, name, credits)
-            )
-            conn.commit()
-            conn.close()
-            reset_field_borders()
-            show_alert_dialog("Success", "Course added successfully!", is_success=True)
-            logging.info(f"Added course: {code} - {name}")
-            clear_form()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO course (CourseCode, CourseName, CreditHours) VALUES (%s, %s, %s)",
+                    (code, name, credits)
+                )
+                conn.commit()
+                
+                reset_field_borders()
+                show_alert_dialog("Success", "Course added successfully!", is_success=True)
+                logging.info(f"Added course: {code} - {name}")
+                clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -437,18 +438,18 @@ def main(page: ft.Page):
 
         def confirm_update():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE course SET CourseCode=%s, CourseName=%s, CreditHours=%s WHERE CourseID=%s",
-                    (code, name, credits, selected_id.current)
-                )
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Course updated successfully!", is_success=True)
-                logging.info(f"Updated course: {code} - {name}")
-                clear_form()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE course SET CourseCode=%s, CourseName=%s, CreditHours=%s WHERE CourseID=%s",
+                        (code, name, credits, selected_id.current)
+                    )
+                    conn.commit()
+                    
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Course updated successfully!", is_success=True)
+                    logging.info(f"Updated course: {code} - {name}")
+                    clear_form()
             except mysql.connector.Error as err:
                 logging.error(f"Database error: {err}")
                 show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -466,15 +467,15 @@ def main(page: ft.Page):
 
         def confirm_delete():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM course WHERE CourseID=%s", (selected_id.current,))
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Course deleted successfully!", is_success=True)
-                logging.info(f"Deleted course: {selected_id.current}")
-                clear_form()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM course WHERE CourseID=%s", (selected_id.current,))
+                    conn.commit()
+                    
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Course deleted successfully!", is_success=True)
+                    logging.info(f"Deleted course: {selected_id.current}")
+                    clear_form()
             except mysql.connector.Error as err:
                 logging.error(f"Database error: {err}")
                 show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)

@@ -16,6 +16,7 @@ import time
 import pandas as pd
 import io
 import base64
+from db_connection import DatabaseConnection
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 from back_button import create_back_button
@@ -142,26 +143,26 @@ def main(page: ft.Page, teacher_id=1):
     def fetch_teacher_courses():
         logging.debug("Fetching teacher courses")
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            query = """
-                SELECT e.CourseID, e.SectionID, c.CourseCode, c.CourseName, s.Name
-                FROM enrollment e
-                JOIN course c ON e.CourseID = c.CourseID
-                JOIN section s ON e.SectionID = s.SectionID
-                WHERE e.Teacher_ID = %s
-            """
-            cursor.execute(query, (teacher_id,))
-            courses = cursor.fetchall()
-            conn.close()
-            course_dropdown.options = [
-                ft.dropdown.Option(
-                    key=f"{course[0]}:{course[1]}",
-                    text=f"{course[2]} - {course[3]} (Section: {course[4]})"
-                ) for course in courses
-            ]
-            page.update()
-            logging.debug("Finished fetching teacher courses")
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT e.CourseID, e.SectionID, c.CourseCode, c.CourseName, s.Name
+                    FROM enrollment e
+                    JOIN course c ON e.CourseID = c.CourseID
+                    JOIN section s ON e.SectionID = s.SectionID
+                    WHERE e.Teacher_ID = %s
+                """
+                cursor.execute(query, (teacher_id,))
+                courses = cursor.fetchall()
+                
+                course_dropdown.options = [
+                    ft.dropdown.Option(
+                        key=f"{course[0]}:{course[1]}",
+                        text=f"{course[2]} - {course[3]} (Section: {course[4]})"
+                    ) for course in courses
+                ]
+                page.update()
+                logging.debug("Finished fetching teacher courses")
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
@@ -169,18 +170,18 @@ def main(page: ft.Page, teacher_id=1):
     def fetch_students(course_id, section_id):
         logging.debug(f"Fetching students for CourseID {course_id}, SectionID {section_id}")
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            query = """
-                SELECT s.Roll_no
-                FROM student s
-                WHERE s.SectionID = %s
-            """
-            cursor.execute(query, (section_id,))
-            students = [row[0] for row in cursor.fetchall()]
-            conn.close()
-            logging.debug(f"Fetched students: {students}")
-            return students
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT s.Roll_no
+                    FROM student s
+                    WHERE s.SectionID = %s
+                """
+                cursor.execute(query, (section_id,))
+                students = [row[0] for row in cursor.fetchall()]
+                
+                logging.debug(f"Fetched students: {students}")
+                return students
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
@@ -189,16 +190,16 @@ def main(page: ft.Page, teacher_id=1):
     def fetch_student_details(roll_no):
         logging.debug(f"Fetching details for Roll No {roll_no}")
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Roll_no, Full_Name FROM student WHERE Roll_no=%s", (roll_no,))
-            result = cursor.fetchone()
-            conn.close()
-            if result:
-                logging.debug(f"Found student: {result}")
-                return result[0], result[1]
-            logging.debug(f"No student found for Roll No {roll_no}")
-            return roll_no, "Unknown"
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Roll_no, Full_Name FROM student WHERE Roll_no=%s", (roll_no,))
+                result = cursor.fetchone()
+                
+                if result:
+                    logging.debug(f"Found student: {result}")
+                    return result[0], result[1]
+                logging.debug(f"No student found for Roll No {roll_no}")
+                return roll_no, "Unknown"
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
@@ -207,21 +208,21 @@ def main(page: ft.Page, teacher_id=1):
     def check_if_already_marked(roll_no, course_id, section_id, teacher_id):
         logging.debug(f"Checking if attendance already marked for Roll No {roll_no}")
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            query = """
-                SELECT COUNT(*) FROM attendance
-                WHERE Roll_no=%s 
-                AND CourseID=%s 
-                AND SectionID=%s 
-                AND Teacher_ID=%s 
-                AND DATE(Attendance_Date)=CURDATE()
-            """
-            cursor.execute(query, (roll_no, course_id, section_id, teacher_id))
-            count = cursor.fetchone()[0]
-            conn.close()
-            logging.debug(f"Attendance marked: {'Yes' if count > 0 else 'No'}")
-            return count > 0
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT COUNT(*) FROM attendance
+                    WHERE Roll_no=%s 
+                    AND CourseID=%s 
+                    AND SectionID=%s 
+                    AND Teacher_ID=%s 
+                    AND DATE(Attendance_Date)=CURDATE()
+                """
+                cursor.execute(query, (roll_no, course_id, section_id, teacher_id))
+                count = cursor.fetchone()[0]
+                
+                logging.debug(f"Attendance marked: {'Yes' if count > 0 else 'No'}")
+                return count > 0
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
@@ -230,21 +231,21 @@ def main(page: ft.Page, teacher_id=1):
     def mark_attendance(roll_no, course_id, section_id, status, name):
         logging.debug(f"Marking attendance for Roll No {roll_no}, Status: {status}")
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            now = datetime.now()
-            date = now.date()
-            time = now.time()
-            cursor.execute("""
-                INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (teacher_id, course_id, section_id, roll_no, date, time, status))
-            conn.commit()
-            conn.close()
-            logging.info(f"Marked {status} for Roll No: {roll_no}")
-            if status == "Present":
-                run_in_thread(play_beep_sound)  # Run in thread
-                # run_in_thread(play_tts_message, f"Attendance marked for {name}")  # Run in thread
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                now = datetime.now()
+                date = now.date()
+                time = now.time()
+                cursor.execute("""
+                    INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (teacher_id, course_id, section_id, roll_no, date, time, status))
+                conn.commit()
+                
+                logging.info(f"Marked {status} for Roll No: {roll_no}")
+                if status == "Present":
+                    run_in_thread(play_beep_sound)  # Run in thread
+                    # run_in_thread(play_tts_message, f"Attendance marked for {name}")  # Run in thread
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Error", f"Database Error: {err}")
@@ -294,37 +295,37 @@ def main(page: ft.Page, teacher_id=1):
 
         try:
             # Retrieve teacher's email
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (teacher_id,))
-            teacher_result = cursor.fetchone()
-            if not teacher_result or not teacher_result[0]:
-                conn.close()
-                show_alert_dialog("Error", "Teacher's email address not found in the database.")
-                return
-            teacher_email, teacher_name = teacher_result
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (teacher_id,))
+                teacher_result = cursor.fetchone()
+                if not teacher_result or not teacher_result[0]:
+                    
+                    show_alert_dialog("Error", "Teacher's email address not found in the database.")
+                    return
+                teacher_email, teacher_name = teacher_result
 
-            # Fetch attendance data for current date
-            course_id, section_id = map(int, course_dropdown.value.split(":"))
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            query = """
-                SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
-                FROM student s
-                LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
-                    AND a.Teacher_ID = %s
-                    AND a.CourseID = %s
-                    AND a.SectionID = %s
-                    AND a.Attendance_Date = %s
-                WHERE s.SectionID = %s
-            """
-            params = (teacher_id, course_id, section_id, current_date, section_id)
-            cursor.execute(query, params)
-            students = cursor.fetchall()
-            conn.close()
+                # Fetch attendance data for current date
+                course_id, section_id = map(int, course_dropdown.value.split(":"))
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                query = """
+                    SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
+                    FROM student s
+                    LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                        AND a.Teacher_ID = %s
+                        AND a.CourseID = %s
+                        AND a.SectionID = %s
+                        AND a.Attendance_Date = %s
+                    WHERE s.SectionID = %s
+                """
+                params = (teacher_id, course_id, section_id, current_date, section_id)
+                cursor.execute(query, params)
+                students = cursor.fetchall()
+                
 
-            if not students:
-                show_alert_dialog("No Data", f"No attendance records found for {current_date}.")
-                return
+                if not students:
+                    show_alert_dialog("No Data", f"No attendance records found for {current_date}.")
+                    return
 
             # Prepare data for Excel
             data = []
@@ -363,7 +364,7 @@ def main(page: ft.Page, teacher_id=1):
                 html_content=f"""
                 <h2>Attendance Report</h2>
                 <p>Hello, <strong>{teacher_name}</strong></p>
-                <p>Attached is the attendance report for <strong>{course_name} on {current_date}<?strong>.</p>
+                <p>Attached is the attendance report for <strong>{course_name} on {current_date}</strong>.</p>
                 <p>Best regards,<br>Attend Smart Team</p>
                 """
             )

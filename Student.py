@@ -5,6 +5,7 @@ import cv2
 import os
 import re
 from datetime import datetime
+from db_connection import DatabaseConnection
 from back_button import create_back_button
 from Dash import show_main
 
@@ -143,7 +144,7 @@ def main(page: ft.Page):
             cursor = conn.cursor()
             cursor.execute("SELECT SectionID, Name, Department FROM section")
             sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
-            conn.close()
+            
             logging.debug(f"Fetched {len(sections)} sections: {sections}")
             return sections
         except mysql.connector.Error as err:
@@ -252,18 +253,18 @@ def main(page: ft.Page):
                 roll_no.error_text = message
             else:
                 try:
-                    conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
-                    result = cursor.fetchone()
-                    logging.debug(f"Duplicate check for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
-                    if result:
-                        roll_no.border_color = ft.colors.RED_400
-                        roll_no.error_text = "Roll number already in use"
-                    else:
-                        roll_no.border_color = ft.colors.GREEN_600
-                        roll_no.error_text = None
-                    conn.close()
+                    with DatabaseConnection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+                        result = cursor.fetchone()
+                        logging.debug(f"Duplicate check for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+                        if result:
+                            roll_no.border_color = ft.colors.RED_400
+                            roll_no.error_text = "Roll number already in use"
+                        else:
+                            roll_no.border_color = ft.colors.GREEN_600
+                            roll_no.error_text = None
+                    
                 except mysql.connector.Error as err:
                     roll_no.border_color = ft.colors.RED_400
                     roll_no.error_text = "Error checking roll number"
@@ -289,18 +290,18 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
-            result = cursor.fetchone()
-            logging.debug(f"Duplicate check in validate_roll_no for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
-            if result:
-                roll_no.border_color = ft.colors.RED_400
-                roll_no.error_text = "Roll number already in use"
-            else:
-                roll_no.border_color = ft.colors.GREEN_600
-                roll_no.error_text = None
-            conn.close()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+                result = cursor.fetchone()
+                logging.debug(f"Duplicate check in validate_roll_no for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+                if result:
+                    roll_no.border_color = ft.colors.RED_400
+                    roll_no.error_text = "Roll number already in use"
+                else:
+                    roll_no.border_color = ft.colors.GREEN_600
+                    roll_no.error_text = None
+            
         except mysql.connector.Error as err:
             roll_no.border_color = ft.colors.RED_400
             roll_no.error_text = "Error checking roll number"
@@ -324,15 +325,15 @@ def main(page: ft.Page):
                 else:
                     roll_no.value = new_roll
                     try:
-                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
-                        result = cursor.fetchone()
-                        logging.debug(f"Duplicate check in validate_fields for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
-                        if result:
-                            field.border_color = ft.colors.RED_400
-                            errors.append("Roll number already in use")
-                        conn.close()
+                        with DatabaseConnection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (new_roll, selected_roll_no.current or ""))
+                            result = cursor.fetchone()
+                            logging.debug(f"Duplicate check in validate_fields for {new_roll}, selected_roll_no.current: {selected_roll_no.current}, result: {result}")
+                            if result:
+                                field.border_color = ft.colors.RED_400
+                                errors.append("Roll number already in use")
+                        
                     except mysql.connector.Error as err:
                         field.border_color = ft.colors.RED_400
                         errors.append("Error checking roll number")
@@ -360,7 +361,7 @@ def main(page: ft.Page):
             cursor = conn.cursor()
             cursor.execute("SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student WHERE Roll_no=%s", (roll,))
             student = cursor.fetchone()
-            conn.close()
+            
             if student:
                 roll_no.value = student[0]
                 full_name.value = student[1]
@@ -432,16 +433,16 @@ def main(page: ft.Page):
                 roll_no.error_text = None
 
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (roll_no.value, selected_roll_no.current or ""))
-            if cursor.fetchone():
-                roll_no.border_color = ft.colors.RED_400
-                roll_no.error_text = "Roll number already in use"
-            else:
-                roll_no.border_color = ft.colors.GREEN_600
-                roll_no.error_text = None
-            conn.close()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Roll_no FROM student WHERE Roll_no=%s AND Roll_no!=%s", (roll_no.value, selected_roll_no.current or ""))
+                if cursor.fetchone():
+                    roll_no.border_color = ft.colors.RED_400
+                    roll_no.error_text = "Roll number already in use"
+                else:
+                    roll_no.border_color = ft.colors.GREEN_600
+                    roll_no.error_text = None
+            
         except mysql.connector.Error as err:
             roll_no.border_color = ft.colors.RED_400
             roll_no.error_text = "Error checking roll number"
@@ -466,7 +467,7 @@ def main(page: ft.Page):
             cursor = conn.cursor()
             cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
             department = cursor.fetchone()
-            conn.close()
+            
             return department[0].strip() if department else None
         except mysql.connector.Error as err:
             logging.error(f"Database error fetching department: {err}")
@@ -580,7 +581,7 @@ def main(page: ft.Page):
                 cursor.execute(query)
             rows = cursor.fetchall()
             logging.debug(f"Fetched {len(rows)} students")
-            conn.close()
+            
             return rows
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
@@ -642,7 +643,7 @@ def main(page: ft.Page):
                 (roll, name, section, photo)
             )
             conn.commit()
-            conn.close()
+            
             reset_field_borders()
             show_alert_dialog("Success", "Student added successfully!", is_success=True)
             logging.info(f"Added student: {roll}")
@@ -693,7 +694,7 @@ def main(page: ft.Page):
                     (roll, name, section, photo, selected_roll_no.current)
                 )
                 conn.commit()
-                conn.close()
+                
                 reset_field_borders()
                 show_alert_dialog("Success", "Student updated successfully!", is_success=True)
                 clear_form()
@@ -721,7 +722,7 @@ def main(page: ft.Page):
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM student WHERE Roll_no=%s", (selected_roll_no.current,))
                 conn.commit()
-                conn.close()
+                
                 reset_field_borders()
                 show_alert_dialog("Success", "Student deleted successfully!", is_success=True)
                 clear_form()

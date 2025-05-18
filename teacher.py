@@ -1,10 +1,10 @@
 import flet as ft
-import mysql.connector
 import logging
 import re
 from back_button import create_back_button
 from Dash import show_main
 import os
+from db_connection import DatabaseConnection
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from datetime import datetime
@@ -237,16 +237,15 @@ def main(page: ft.Page):
             page.update()
             return
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
-            if cursor.fetchone():
-                username.border_color = ft.colors.RED_400
-                username.error_text = "Username already in use"
-            else:
-                username.border_color = ft.colors.GREEN_600
-                username.error_text = None
-            conn.close()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
+                if cursor.fetchone():
+                    username.border_color = ft.colors.RED_400
+                    username.error_text = "Username already in use"
+                else:
+                    username.border_color = ft.colors.GREEN_600
+                    username.error_text = None
         except Exception as e:
             username.border_color = ft.colors.RED_400
             username.error_text = "Error checking username"
@@ -320,14 +319,14 @@ def main(page: ft.Page):
                     missing_fields.append(field.label)
                 else:
                     try:
-                        conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
-                        if cursor.fetchone():
-                            field.border_color = ft.colors.RED_400
-                            field.error_text = "Username already in use"
-                            missing_fields.append(field.label)
-                        conn.close()
+                        with DatabaseConnection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT Username FROM teachers WHERE Username=%s AND Teacher_ID!=%s", (value, selected_id.current or 0))
+                            if cursor.fetchone():
+                                field.border_color = ft.colors.RED_400
+                                field.error_text = "Username already in use"
+                                missing_fields.append(field.label)
+                        
                     except Exception as e:
                         field.border_color = ft.colors.RED_400
                         field.error_text = "Error checking username"
@@ -357,15 +356,14 @@ def main(page: ft.Page):
 
     def fetch_teachers(search_term=""):
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            if search_term:
-                cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers WHERE Full_Name LIKE %s OR Username LIKE %s", (f"%{search_term}%", f"%{search_term}%"))
-            else:
-                cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers")
-            data = cursor.fetchall()
-            conn.close()
-            return data
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                if search_term:
+                    cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers WHERE Full_Name LIKE %s OR Username LIKE %s", (f"%{search_term}%", f"%{search_term}%"))
+                else:
+                    cursor.execute("SELECT Teacher_ID, Full_Name, Email, Phone, Username FROM teachers")
+                data = cursor.fetchall()
+                return data
         except Exception as e:
             show_alert_dialog("Error", f"Error fetching data: {e}", is_error=True)
             return []
@@ -408,15 +406,15 @@ def main(page: ft.Page):
     def select_teacher(teacher_id):
         selected_id.current = teacher_id
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Full_Name, Email, Phone, Username, Password FROM teachers WHERE Teacher_ID=%s", (teacher_id,))
-            t = cursor.fetchone()
-            conn.close()
-            if t:
-                full_name.value, email.value, phone.value, username.value, password.value = t
-            reset_field_borders()
-            page.update()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Full_Name, Email, Phone, Username, Password FROM teachers WHERE Teacher_ID=%s", (teacher_id,))
+                t = cursor.fetchone()
+                
+                if t:
+                    full_name.value, email.value, phone.value, username.value, password.value = t
+                reset_field_borders()
+                page.update()
         except Exception as e:
             show_alert_dialog("Error", f"Select error: {e}", is_error=True)
 
@@ -433,25 +431,25 @@ def main(page: ft.Page):
             show_alert_dialog("Validation Error", error_message, is_error=True)
             return
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO teachers (Full_Name, Email, Phone, Username, Password) VALUES (%s, %s, %s, %s, %s)",
-                           (full_name.value, email.value, phone.value, username.value, password.value))
-            conn.commit()
-            conn.close()
-            # Send email notification
-            send_teacher_notification(
-                teacher_email=email.value.strip(),
-                teacher_name=full_name.value.strip(),
-                teacher_phone=phone.value.strip(),
-                username=username.value.strip(),
-                password=password.value.strip(),
-                action="added"
-            )
-            reset_field_borders()
-            show_alert_dialog("Success", "Teacher added successfully!", is_success=True)
-            clear_form()
-            update_table()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO teachers (Full_Name, Email, Phone, Username, Password) VALUES (%s, %s, %s, %s, %s)",
+                            (full_name.value, email.value, phone.value, username.value, password.value))
+                conn.commit()
+            
+                # Send email notification
+                send_teacher_notification(
+                    teacher_email=email.value.strip(),
+                    teacher_name=full_name.value.strip(),
+                    teacher_phone=phone.value.strip(),
+                    username=username.value.strip(),
+                    password=password.value.strip(),
+                    action="added"
+                )
+                reset_field_borders()
+                show_alert_dialog("Success", "Teacher added successfully!", is_success=True)
+                clear_form()
+                update_table()
         except Exception as e:
             show_alert_dialog("Error", f"Add error: {e}", is_error=True)
 
@@ -474,25 +472,24 @@ def main(page: ft.Page):
 
         def confirm_update():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE teachers SET Full_Name=%s, Email=%s, Phone=%s, Username=%s, Password=%s WHERE Teacher_ID=%s",
-                               (full_name.value, email.value, phone.value, username.value, password.value, selected_id.current))
-                conn.commit()
-                conn.close()
-                # Send email notification
-                send_teacher_notification(
-                    teacher_email=email.value.strip(),
-                    teacher_name=full_name.value.strip(),
-                    teacher_phone=phone.value.strip(),
-                    username=username.value.strip(),
-                    password=password.value.strip(),
-                    action="updated"
-                )
-                reset_field_borders()
-                show_alert_dialog("Success", "Teacher updated successfully!", is_success=True)
-                clear_form()
-                update_table()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE teachers SET Full_Name=%s, Email=%s, Phone=%s, Username=%s, Password=%s WHERE Teacher_ID=%s",
+                                (full_name.value, email.value, phone.value, username.value, password.value, selected_id.current))
+                    conn.commit()
+                    # Send email notification
+                    send_teacher_notification(
+                        teacher_email=email.value.strip(),
+                        teacher_name=full_name.value.strip(),
+                        teacher_phone=phone.value.strip(),
+                        username=username.value.strip(),
+                        password=password.value.strip(),
+                        action="updated"
+                    )
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Teacher updated successfully!", is_success=True)
+                    clear_form()
+                    update_table()
             except Exception as e:
                 show_alert_dialog("Error", f"Update error: {e}", is_error=True)
 
@@ -505,15 +502,14 @@ def main(page: ft.Page):
 
         def confirm_delete():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM teachers WHERE Teacher_ID=%s", (selected_id.current,))
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Teacher deleted successfully!", is_success=True)
-                clear_form()
-                update_table()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM teachers WHERE Teacher_ID=%s", (selected_id.current,))
+                    conn.commit()
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Teacher deleted successfully!", is_success=True)
+                    clear_form()
+                    update_table()
             except Exception as e:
                 show_alert_dialog("Error", f"Delete error: {e}", is_error=True)
 

@@ -1,6 +1,7 @@
 import flet as ft
 import mysql.connector
 import logging
+from db_connection import DatabaseConnection
 import asyncio
 
 def configure_logging():
@@ -102,16 +103,15 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
     # Fetch teacher's name from the database
     def fetch_teacher_name():
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute("SELECT Full_Name FROM teachers WHERE Teacher_ID = %s", (teacher_id,))
-            result = cursor.fetchone()
-            conn.close()
-            if result:
-                return result[0]
-            else:
-                show_message("Teacher not found!", is_error=True)
-                return "Unknown Teacher"
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Full_Name FROM teachers WHERE Teacher_ID = %s", (teacher_id,))
+                result = cursor.fetchone()
+                if result:
+                    return result[0]
+                else:
+                    show_message("Teacher not found!", is_error=True)
+                    return "Unknown Teacher"
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_message(f"Database Error: {err}", is_error=True)

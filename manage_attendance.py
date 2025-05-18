@@ -6,6 +6,7 @@ import re
 import threading
 import pandas as pd
 import io
+from db_connection import DatabaseConnection
 import base64
 import os
 from sendgrid import SendGridAPIClient
@@ -147,32 +148,26 @@ def main_manage(page: ft.Page, teacher_id=1):
             course_section_dropdown.options = []
             data_table.rows = []
             try:
-                conn = mysql.connector.connect(
-                    host="localhost",
-                    user="root",
-                    password="root",
-                    database="face_db",
-                    port=3306
-                )
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT e.CourseID, c.CourseName, e.SectionID, s.Name
-                    FROM enrollment e
-                    JOIN course c ON e.CourseID = c.CourseID
-                    JOIN section s ON e.SectionID = s.SectionID
-                    WHERE e.Teacher_ID = %s
-                """, (DUMMY_TEACHER_ID,))
-                course_sections = cursor.fetchall()
-                conn.close()
-                course_section_dropdown.options = [
-                    ft.dropdown.Option(
-                        key=f"{course_id}:{section_id}",
-                        text=f"{course_name} - {section_name}"
-                    )
-                    for course_id, course_name, section_id, section_name in course_sections
-                ]
-                page.update()
-                update_table()
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT e.CourseID, c.CourseName, e.SectionID, s.Name
+                        FROM enrollment e
+                        JOIN course c ON e.CourseID = c.CourseID
+                        JOIN section s ON e.SectionID = s.SectionID
+                        WHERE e.Teacher_ID = %s
+                    """, (DUMMY_TEACHER_ID,))
+                    course_sections = cursor.fetchall()
+                    
+                    course_section_dropdown.options = [
+                        ft.dropdown.Option(
+                            key=f"{course_id}:{section_id}",
+                            text=f"{course_name} - {section_name}"
+                        )
+                        for course_id, course_name, section_id, section_name in course_sections
+                    ]
+                    page.update()
+                    update_table()
             except Exception as e:
                 show_alert_dialog("Error", f"Error fetching courses and sections: {e}")
                 logging.error(f"Error fetching courses and sections: {e}")
@@ -180,40 +175,33 @@ def main_manage(page: ft.Page, teacher_id=1):
         def update_attendance(roll_no, course_id, section_id, new_status, old_status):
             logging.debug(f"Updating attendance for Roll No: {roll_no}, New Status: {new_status}, Old Status: {old_status}")
             try:
-                conn = mysql.connector.connect(
-                    host="localhost",
-                    user="root",
-                    password="root",
-                    database="face_db",
-                    port=3306
-                )
-                cursor = conn.cursor()
-                
-                now = datetime.now()
-                if old_status == "Absent":
-                    cursor.execute("""
-                        INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (DUMMY_TEACHER_ID, course_id, section_id, roll_no, selected_date.current, now.time(), new_status))
-                    conn.commit()
-                    logging.debug(f"Inserted new attendance record for Roll No: {roll_no}, Status: {new_status}")
-                    set_status_text(f"Attendance set to {new_status} for Roll No: {roll_no}")
-                else:
-                    cursor.execute("""
-                        UPDATE attendance
-                        SET Status = %s, Attendance_Time = %s
-                        WHERE Roll_no = %s
-                        AND Teacher_ID = %s
-                        AND CourseID = %s
-                        AND SectionID = %s
-                        AND Attendance_Date = %s
-                    """, (new_status, now.time(), roll_no, DUMMY_TEACHER_ID, course_id, section_id, selected_date.current))
-                    conn.commit()
-                    logging.debug(f"Updated attendance for Roll No: {roll_no} to Status: {new_status}")
-                    set_status_text(f"Attendance updated to {new_status} for Roll No: {roll_no}")
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    
+                    now = datetime.now()
+                    if old_status == "Absent":
+                        cursor.execute("""
+                            INSERT INTO attendance (Teacher_ID, CourseID, SectionID, Roll_no, Attendance_Date, Attendance_Time, Status)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (DUMMY_TEACHER_ID, course_id, section_id, roll_no, selected_date.current, now.time(), new_status))
+                        conn.commit()
+                        logging.debug(f"Inserted new attendance record for Roll No: {roll_no}, Status: {new_status}")
+                        set_status_text(f"Attendance set to {new_status} for Roll No: {roll_no}")
+                    else:
+                        cursor.execute("""
+                            UPDATE attendance
+                            SET Status = %s, Attendance_Time = %s
+                            WHERE Roll_no = %s
+                            AND Teacher_ID = %s
+                            AND CourseID = %s
+                            AND SectionID = %s
+                            AND Attendance_Date = %s
+                        """, (new_status, now.time(), roll_no, DUMMY_TEACHER_ID, course_id, section_id, selected_date.current))
+                        conn.commit()
+                        logging.debug(f"Updated attendance for Roll No: {roll_no} to Status: {new_status}")
+                        set_status_text(f"Attendance updated to {new_status} for Roll No: {roll_no}")
 
-                conn.close()
-                update_table()
+                    update_table()
             except Exception as e:
                 logging.error(f"Error updating attendance: {e}")
                 show_alert_dialog("Error", f"Failed to update attendance: {e}")
@@ -236,42 +224,36 @@ def main_manage(page: ft.Page, teacher_id=1):
 
             try:
                 # Retrieve teacher's email
-                conn = mysql.connector.connect(
-                    host="localhost",
-                    user="root",
-                    password="root",
-                    database="face_db",
-                    port=3306
-                )
-                cursor = conn.cursor()
-                cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (DUMMY_TEACHER_ID,))
-                teacher_result = cursor.fetchone()
-                if not teacher_result or not teacher_result[0]:
-                    conn.close()
-                    show_alert_dialog("Error", "Teacher's email address not found in the database.")
-                    return
-                teacher_email, teacher_name = teacher_result
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT Email, Full_Name FROM teachers WHERE Teacher_ID = %s", (DUMMY_TEACHER_ID,))
+                    teacher_result = cursor.fetchone()
+                    if not teacher_result or not teacher_result[0]:
+                        
+                        show_alert_dialog("Error", "Teacher's email address not found in the database.")
+                        return
+                    teacher_email, teacher_name = teacher_result
 
-                # Fetch attendance data
-                course_id, section_id = map(int, course_section_dropdown.value.split(":"))
-                query = """
-                    SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
-                    FROM student s
-                    LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
-                        AND a.Teacher_ID = %s
-                        AND a.CourseID = %s
-                        AND a.SectionID = %s
-                        AND a.Attendance_Date = %s
-                    WHERE s.SectionID = %s
-                """
-                params = (DUMMY_TEACHER_ID, course_id, section_id, selected_date.current, section_id)
-                cursor.execute(query, params)
-                students = cursor.fetchall()
-                conn.close()
+                    # Fetch attendance data
+                    course_id, section_id = map(int, course_section_dropdown.value.split(":"))
+                    query = """
+                        SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
+                        FROM student s
+                        LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                            AND a.Teacher_ID = %s
+                            AND a.CourseID = %s
+                            AND a.SectionID = %s
+                            AND a.Attendance_Date = %s
+                        WHERE s.SectionID = %s
+                    """
+                    params = (DUMMY_TEACHER_ID, course_id, section_id, selected_date.current, section_id)
+                    cursor.execute(query, params)
+                    students = cursor.fetchall()
+                    
 
-                if not students:
-                    show_alert_dialog("No Data", f"No attendance records found for {selected_date.current}.")
-                    return
+                    if not students:
+                        show_alert_dialog("No Data", f"No attendance records found for {selected_date.current}.")
+                        return
 
                 # Prepare data for Excel
                 data = []
@@ -380,36 +362,30 @@ def main_manage(page: ft.Page, teacher_id=1):
 
             try:
                 course_id, section_id = map(int, course_section_dropdown.value.split(":"))
-                conn = mysql.connector.connect(
-                    host="localhost",
-                    user="root",
-                    password="root",
-                    database="face_db",
-                    port=3306
-                )
-                cursor = conn.cursor()
-                query = """
-                    SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
-                    FROM student s
-                    LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
-                        AND a.Teacher_ID = %s
-                        AND a.CourseID = %s
-                        AND a.SectionID = %s
-                        AND a.Attendance_Date = %s
-                    WHERE s.SectionID = %s
-                """
-                params = (DUMMY_TEACHER_ID, course_id, section_id, date_value, section_id)
-                logging.debug(f"Executing query: {query % params}")
-                cursor.execute(query, params)
-                students = cursor.fetchall()
-                logging.debug(f"Fetched students: {students}")
-                conn.close()
-                
-                if not students:
-                    logging.debug(f"No data found for date {date_value}")
-                    show_alert_dialog("No Data", f"No attendance records found for {date_value}.")
-                    page.update()
-                    return
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    query = """
+                        SELECT s.Roll_no, s.Full_Name, a.Status, a.Attendance_Time
+                        FROM student s
+                        LEFT JOIN attendance a ON s.Roll_no = a.Roll_no
+                            AND a.Teacher_ID = %s
+                            AND a.CourseID = %s
+                            AND a.SectionID = %s
+                            AND a.Attendance_Date = %s
+                        WHERE s.SectionID = %s
+                    """
+                    params = (DUMMY_TEACHER_ID, course_id, section_id, date_value, section_id)
+                    logging.debug(f"Executing query: {query % params}")
+                    cursor.execute(query, params)
+                    students = cursor.fetchall()
+                    logging.debug(f"Fetched students: {students}")
+                    
+                    
+                    if not students:
+                        logging.debug(f"No data found for date {date_value}")
+                        show_alert_dialog("No Data", f"No attendance records found for {date_value}.")
+                        page.update()
+                        return
                 
                 for roll_no, full_name, status, attendance_time in students:
                     current_status = status if status else "Absent"

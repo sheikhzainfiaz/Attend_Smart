@@ -1,6 +1,7 @@
 import flet as ft
 import mysql.connector
 import logging
+from db_connection import DatabaseConnection
 from back_button import create_back_button
 from Dash import show_main
 
@@ -208,84 +209,83 @@ def main(page: ft.Page):
 
     def fetch_dropdown_data():
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
 
-            # Fetch sections
-            cursor.execute("SELECT SectionID, Name FROM section")
-            sections = cursor.fetchall()
-            section_dropdown.options = [ft.dropdown.Option(key=str(s[0]), text=f"{s[0]} - {s[1]}") for s in sections]
+                # Fetch sections
+                cursor.execute("SELECT SectionID, Name FROM section")
+                sections = cursor.fetchall()
+                section_dropdown.options = [ft.dropdown.Option(key=str(s[0]), text=f"{s[0]} - {s[1]}") for s in sections]
 
-            # Fetch teachers
-            cursor.execute("SELECT Teacher_ID, Full_Name FROM teachers")
-            teachers = cursor.fetchall()
-            teacher_dropdown.options = [ft.dropdown.Option(key=str(t[0]), text=f"{t[0]} - {t[1]}") for t in teachers]
+                # Fetch teachers
+                cursor.execute("SELECT Teacher_ID, Full_Name FROM teachers")
+                teachers = cursor.fetchall()
+                teacher_dropdown.options = [ft.dropdown.Option(key=str(t[0]), text=f"{t[0]} - {t[1]}") for t in teachers]
 
-            # Fetch courses (initially all, will be filtered by section)
-            update_course_dropdown(None)
+                # Fetch courses (initially all, will be filtered by section)
+                update_course_dropdown(None)
 
-            conn.close()
-            page.update()
+                page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
 
     def update_course_dropdown(section_id):
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            if section_id:
-                # Fetch courses not allocated to the selected section
-                query = """
-                    SELECT CourseID, CourseCode, CourseName
-                    FROM course
-                    WHERE CourseID NOT IN (
-                        SELECT CourseID FROM enrollment WHERE SectionID = %s
-                    )
-                """
-                cursor.execute(query, (section_id,))
-            else:
-                # Fetch all courses if no section is selected
-                cursor.execute("SELECT CourseID, CourseCode, CourseName FROM course")
-            courses = cursor.fetchall()
-            course_dropdown.options = [ft.dropdown.Option(key=str(c[0]), text=f"{c[1]} - {c[2]}") for c in courses]
-            course_dropdown.value = None
-            # Show message if no courses are available for the selected section
-            section_message.visible = section_id is not None and not courses
-            logging.debug(f"Section message visible: {section_message.visible}, Courses available: {len(courses)}")
-            conn.close()
-            page.update()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                if section_id:
+                    # Fetch courses not allocated to the selected section
+                    query = """
+                        SELECT CourseID, CourseCode, CourseName
+                        FROM course
+                        WHERE CourseID NOT IN (
+                            SELECT CourseID FROM enrollment WHERE SectionID = %s
+                        )
+                    """
+                    cursor.execute(query, (section_id,))
+                else:
+                    # Fetch all courses if no section is selected
+                    cursor.execute("SELECT CourseID, CourseCode, CourseName FROM course")
+                courses = cursor.fetchall()
+                course_dropdown.options = [ft.dropdown.Option(key=str(c[0]), text=f"{c[1]} - {c[2]}") for c in courses]
+                course_dropdown.value = None
+                # Show message if no courses are available for the selected section
+                section_message.visible = section_id is not None and not courses
+                logging.debug(f"Section message visible: {section_message.visible}, Courses available: {len(courses)}")
+                
+                page.update()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
 
     def fetch_enrollments(search_term=""):
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            if search_term:
-                query = """
-                    SELECT e.Teacher_ID, e.CourseID, e.SectionID, t.Full_Name, c.CourseName, s.Name
-                    FROM enrollment e
-                    JOIN teachers t ON e.Teacher_ID = t.Teacher_ID
-                    JOIN course c ON e.CourseID = c.CourseID
-                    JOIN section s ON e.SectionID = s.SectionID
-                    WHERE t.Full_Name LIKE %s
-                """
-                cursor.execute(query, (f"%{search_term}%",))
-            else:
-                query = """
-                    SELECT e.Teacher_ID, e.CourseID, e.SectionID, t.Full_Name, c.CourseName, s.Name
-                    FROM enrollment e
-                    JOIN teachers t ON e.Teacher_ID = t.Teacher_ID
-                    JOIN course c ON e.CourseID = c.CourseID
-                    JOIN section s ON e.SectionID = s.SectionID
-                """
-                cursor.execute(query)
-            data = cursor.fetchall()
-            conn.close()
-            logging.debug(f"Fetched {len(data)} enrollments")
-            return data
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                if search_term:
+                    query = """
+                        SELECT e.Teacher_ID, e.CourseID, e.SectionID, t.Full_Name, c.CourseName, s.Name
+                        FROM enrollment e
+                        JOIN teachers t ON e.Teacher_ID = t.Teacher_ID
+                        JOIN course c ON e.CourseID = c.CourseID
+                        JOIN section s ON e.SectionID = s.SectionID
+                        WHERE t.Full_Name LIKE %s
+                    """
+                    cursor.execute(query, (f"%{search_term}%",))
+                else:
+                    query = """
+                        SELECT e.Teacher_ID, e.CourseID, e.SectionID, t.Full_Name, c.CourseName, s.Name
+                        FROM enrollment e
+                        JOIN teachers t ON e.Teacher_ID = t.Teacher_ID
+                        JOIN course c ON e.CourseID = c.CourseID
+                        JOIN section s ON e.SectionID = s.SectionID
+                    """
+                    cursor.execute(query)
+                data = cursor.fetchall()
+                
+                logging.debug(f"Fetched {len(data)} enrollments")
+                return data
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -338,18 +338,18 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO enrollment (Teacher_ID, CourseID, SectionID) VALUES (%s, %s, %s)",
-                (teacher, course, section)
-            )
-            conn.commit()
-            conn.close()
-            reset_field_borders()
-            show_alert_dialog("Success", "Enrollment added successfully!", is_success=True)
-            logging.info(f"Added enrollment: Teacher {teacher}, Course {course}, Section {section}")
-            clear_form()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO enrollment (Teacher_ID, CourseID, SectionID) VALUES (%s, %s, %s)",
+                    (teacher, course, section)
+                )
+                conn.commit()
+                
+                reset_field_borders()
+                show_alert_dialog("Success", "Enrollment added successfully!", is_success=True)
+                logging.info(f"Added enrollment: Teacher {teacher}, Course {course}, Section {section}")
+                clear_form()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
@@ -365,22 +365,22 @@ def main(page: ft.Page):
 
         def confirm_delete():
             try:
-                conn = mysql.connector.connect(host="localhost", user="root", password="root", database="face_db", port=3306)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "DELETE FROM enrollment WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
-                    (
-                        selected_ids.current["Teacher_ID"],
-                        selected_ids.current["CourseID"],
-                        selected_ids.current["SectionID"]
+                with DatabaseConnection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "DELETE FROM enrollment WHERE Teacher_ID=%s AND CourseID=%s AND SectionID=%s",
+                        (
+                            selected_ids.current["Teacher_ID"],
+                            selected_ids.current["CourseID"],
+                            selected_ids.current["SectionID"]
+                        )
                     )
-                )
-                conn.commit()
-                conn.close()
-                reset_field_borders()
-                show_alert_dialog("Success", "Enrollment deleted successfully!", is_success=True)
-                logging.info(f"Deleted enrollment: Teacher {selected_ids.current['Teacher_ID']}, Course {selected_ids.current['CourseID']}, Section {selected_ids.current['SectionID']}")
-                clear_form()
+                    conn.commit()
+                    
+                    reset_field_borders()
+                    show_alert_dialog("Success", "Enrollment deleted successfully!", is_success=True)
+                    logging.info(f"Deleted enrollment: Teacher {selected_ids.current['Teacher_ID']}, Course {selected_ids.current['CourseID']}, Section {selected_ids.current['SectionID']}")
+                    clear_form()
             except mysql.connector.Error as err:
                 logging.error(f"Database error: {err}")
                 show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)

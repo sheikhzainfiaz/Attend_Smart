@@ -3,6 +3,7 @@ import mysql.connector
 from Dash import show_main
 from teacher_dashboard import teacher_dashboard
 import os
+from db_connection import DatabaseConnection
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from datetime import datetime
@@ -157,40 +158,32 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
 
-            table = "admins" if role == "admin" else "teachers"
-            if role == "admin":
-                cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
-                result = cursor.fetchone()
-                if result and result[0] == pwd:
-                    page.controls.clear()
-                    show_main(page)  # Navigate to admin dashboard first
-                    show_alert_dialog("Success", "Login successful!", is_success=True)
-                else:
-                    show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
-            else:  # teacher
-                cursor.execute(f"SELECT password, Teacher_ID, Email, Full_Name FROM {table} WHERE username=%s", (uname,))
-                result = cursor.fetchone()
-                if result and result[0] == pwd:
-                    teacher_id = result[1] if result[1] else "Teacher"
-                    teacher_email = result[2] if result[2] else None
-                    teacher_name = result[3] if result[3] else "Teacher"
-                    page.controls.clear()
-                    teacher_dashboard(page, teacher_id)  # Navigate to teacher dashboard first
-                    send_login_email(teacher_email, teacher_name)  # Send email if valid
-                    # No success dialog for teacher
-                else:
-                    show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
-
-            conn.close()
+                table = "admins" if role == "admin" else "teachers"
+                if role == "admin":
+                    cursor.execute(f"SELECT password FROM {table} WHERE username=%s", (uname,))
+                    result = cursor.fetchone()
+                    if result and result[0] == pwd:
+                        page.controls.clear()
+                        show_main(page)  # Navigate to admin dashboard first
+                        show_alert_dialog("Success", "Login successful!", is_success=True)
+                    else:
+                        show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
+                else:  # teacher
+                    cursor.execute(f"SELECT password, Teacher_ID, Email, Full_Name FROM {table} WHERE username=%s", (uname,))
+                    result = cursor.fetchone()
+                    if result and result[0] == pwd:
+                        teacher_id = result[1] if result[1] else "Teacher"
+                        teacher_email = result[2] if result[2] else None
+                        teacher_name = result[3] if result[3] else "Teacher"
+                        page.controls.clear()
+                        teacher_dashboard(page, teacher_id)  # Navigate to teacher dashboard first
+                        send_login_email(teacher_email, teacher_name)  # Send email if valid
+                        # No success dialog for teacher
+                    else:
+                        show_alert_dialog("Login Failed", "Incorrect password" if result else "Username not found", is_error=True)
 
         except mysql.connector.Error as err:
             show_alert_dialog("Database Error", f"Database Error: {err}", is_error=True)
