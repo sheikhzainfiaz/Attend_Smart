@@ -5,6 +5,5 @@
         "password": "root",
         "database": "face_db",
         "port": 3306
-    },
-    "sendgrid_api_key": "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"
+    }
 }

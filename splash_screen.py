@@ -18,10 +18,10 @@ def main(page: ft.Page):
         end=ft.Alignment(1, 1),
         colors=[ft.colors.BLUE_GREY_800, ft.colors.BLUE_GREY_900]
     )
-
+    import os
     # Logo with animation (fade-in and scale)
     logo = ft.Image(
-        src="assests\logo.png",  # Local image in assets folder
+        src=os.path.join("assets", "logo.png"),  # Local image in assets folder
         width=300,
         height=300,
         fit=ft.ImageFit.CONTAIN,
