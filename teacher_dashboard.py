@@ -63,8 +63,8 @@ def teacher_dashboard(page: ft.Page, teacher_id: int):
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text(title, style=ft.TextStyle(color=ft.colors.BLACK)),
-            content=ft.Text(message, color=ft.colors.BLACK),
+            title=ft.Text(title),
+            content=ft.Text(message),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda e: close_dialog()),
                 ft.TextButton("Yes", on_click=handle_confirm)
