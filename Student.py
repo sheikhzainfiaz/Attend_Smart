@@ -134,19 +134,13 @@ def main(page: ft.Page):
          # Function to fetch sections from the MySQL database
     def get_sections_from_db():
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT SectionID, Name, Department FROM section")
-            sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
-            
-            logging.debug(f"Fetched {len(sections)} sections: {sections}")
-            return sections
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT SectionID, Name, Department FROM section")
+                sections = [{"id": row[0], "name": row[1], "department": row[2]} for row in cursor.fetchall()]
+                
+                logging.debug(f"Fetched {len(sections)} sections: {sections}")
+                return sections
         except mysql.connector.Error as err:
             logging.error(f"Database error fetching sections: {err}")
             return []
@@ -351,32 +345,26 @@ def main(page: ft.Page):
         logging.debug(f"Selected row with Roll_no: {roll}")
         selected_roll_no.current = roll
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student WHERE Roll_no=%s", (roll,))
-            student = cursor.fetchone()
-            
-            if student:
-                roll_no.value = student[0]
-                full_name.value = student[1]
-                section_id.value = str(student[2]) if student[2] else None
-                photo_sample.value = student[3] if student[3] else None
-                logging.debug(f"Selected student - Roll_no: {roll_no.value}, Section: {section_id.value}, Photo Sample: {photo_sample.value}")
-                # Validate the roll number after selection
-                if section_id.value:
-                    department = get_department_by_section(section_id.value)
-                    validate_roll_no(roll_no.value, department)
-                else:
-                    roll_no.border_color = accent_color
-                    roll_no.error_text = None
-            reset_field_borders()
-            page.update()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student WHERE Roll_no=%s", (roll,))
+                student = cursor.fetchone()
+                
+                if student:
+                    roll_no.value = student[0]
+                    full_name.value = student[1]
+                    section_id.value = str(student[2]) if student[2] else None
+                    photo_sample.value = student[3] if student[3] else None
+                    logging.debug(f"Selected student - Roll_no: {roll_no.value}, Section: {section_id.value}, Photo Sample: {photo_sample.value}")
+                    # Validate the roll number after selection
+                    if section_id.value:
+                        department = get_department_by_section(section_id.value)
+                        validate_roll_no(roll_no.value, department)
+                    else:
+                        roll_no.border_color = accent_color
+                        roll_no.error_text = None
+                reset_field_borders()
+                page.update()
         except mysql.connector.Error as err:
             show_alert_dialog("Database Error", f"Error selecting student: {err}", is_error=True)
 
@@ -457,18 +445,12 @@ def main(page: ft.Page):
         if not section_id:
             return None
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
-            department = cursor.fetchone()
-            
-            return department[0].strip() if department else None
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Department FROM section WHERE SectionID = %s", (section_id,))
+                department = cursor.fetchone()
+                
+                return department[0].strip() if department else None
         except mysql.connector.Error as err:
             logging.error(f"Database error fetching department: {err}")
             return None
@@ -565,22 +547,16 @@ def main(page: ft.Page):
     def fetch_students(search_term=""):
         logging.debug(f"Fetching students with search term: {search_term}")
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            query = "SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student"
-            if search_term:
-                query += " WHERE Full_Name LIKE %s OR Roll_no LIKE %s OR SectionID LIKE %s"
-                cursor.execute(query, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
-            else:
-                cursor.execute(query)
-            rows = cursor.fetchall()
-            logging.debug(f"Fetched {len(rows)} students")
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                query = "SELECT Roll_no, Full_Name, SectionID, PhotoSample FROM student"
+                if search_term:
+                    query += " WHERE Full_Name LIKE %s OR Roll_no LIKE %s OR SectionID LIKE %s"
+                    cursor.execute(query, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
+                else:
+                    cursor.execute(query)
+                rows = cursor.fetchall()
+                logging.debug(f"Fetched {len(rows)} students")
             
             return rows
         except mysql.connector.Error as err:
@@ -630,25 +606,19 @@ def main(page: ft.Page):
             return
 
         try:
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="root",
-                database="face_db",
-                port=3306
-            )
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO student (Roll_no, Full_Name, SectionID, PhotoSample) VALUES (%s, %s, %s, %s)",
-                (roll, name, section, photo)
-            )
-            conn.commit()
-            
-            reset_field_borders()
-            show_alert_dialog("Success", "Student added successfully!", is_success=True)
-            logging.info(f"Added student: {roll}")
-            clear_form()
-            update_table()
+            with DatabaseConnection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO student (Roll_no, Full_Name, SectionID, PhotoSample) VALUES (%s, %s, %s, %s)",
+                    (roll, name, section, photo)
+                )
+                conn.commit()
+                
+                reset_field_borders()
+                show_alert_dialog("Success", "Student added successfully!", is_success=True)
+                logging.info(f"Added student: {roll}")
+                clear_form()
+                update_table()
         except mysql.connector.Error as err:
             logging.error(f"Database error: {err}")
             show_alert_dialog("Database Error", f"Error adding student: {err}", is_error=True)
