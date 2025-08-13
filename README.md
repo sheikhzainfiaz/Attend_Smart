@@ -1,5 +1,5 @@
 
-# Attend Smart <img src="https://github.com/sheikhzainfiaz/Attend_Smart/blob/3d5e993469f5d7125432527a997372cd642babe5/assets/logo.png" alt="Attend Smart Logo" width="40"/>
+# Attend Smart <img src="https://github.com/sheikhzainfiaz/Attend_Smart/blob/3d5e993469f5d7125432527a997372cd642babe5/assets/logo.png" alt="Attend Smart Logo" width="60"/>
 
 
 **Attend Smart** is a **face recognition–based attendance system** designed with advanced security and user-friendly features.  
