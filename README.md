@@ -108,8 +108,8 @@ The system was developed with integration for **National Textile University (NTU
 
 ## ✨ Authors
 
-* **Sheikh Zain Fiaz** – Project Lead & Developer
-* **Team Members** – \[Add Names Here]
+* **Sheikh Zain Fiaz** – 
+* **Team Members** – \Muhammad Talha, Taha Manshoor
 
 ---
 
@@ -118,6 +118,5 @@ The system was developed with integration for **National Textile University (NTU
 This project is open source — you may modify and adapt it as per your needs.
 
 ```
-
-That will make your project page instantly more eye-catching.
+Don't misuse the project
 ```
