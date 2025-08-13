@@ -64,7 +64,7 @@ The system was developed with integration for **National Textile University (NTU
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/attend_smart.git
+   git clone https://github.com/sheikhzainfiaz/attend_smart.git
    cd attend_smart
    ```
 
