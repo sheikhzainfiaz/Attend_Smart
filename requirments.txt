@@ -1,0 +1,10 @@
+flet==0.21.0
+opencv-python
+face_recognition
+numpy
+Pillow
+mysql-connector-python
+sendgrid
+pandas
+reportlab
+python-dotenv
