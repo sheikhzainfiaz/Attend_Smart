@@ -47,19 +47,15 @@ The system was developed with integration for **National Textile University (NTU
 
 ### 1. Login Page
 
-![Login Page Screenshot](path/to/login_screenshot.png)
+![Login Page Screenshot](https://github.com/sheikhzainfiaz/Attend_Smart/blob/cba5b2ef5047636d8ea26e6af4c696d06cb2b1a7/Screenshot%202025-08-13%20113556.png)
 
 ### 2. Dashboard
 
-![Dashboard Screenshot](path/to/dashboard_screenshot.png)
+![Dashboard Screenshot](https://github.com/sheikhzainfiaz/Attend_Smart/blob/35d1d1bfac1cb830098931793912bc3c34721616/Screenshot%202025-08-13%20114104.png)
 
-### 3. Face Recognition Attendance
+### 3. Export Attendance Excel
 
-![Face Recognition Screenshot](path/to/face_recognition_screenshot.png)
-
-### 4. Export Attendance Excel
-
-![Export Screenshot](path/to/export_screenshot.png)
+![Export Screenshot](https://github.com/sheikhzainfiaz/Attend_Smart/blob/35d1d1bfac1cb830098931793912bc3c34721616/Screenshot%202025-08-13%20114001.png)
 
 ---
 
